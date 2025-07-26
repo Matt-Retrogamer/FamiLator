@@ -1,0 +1,24 @@
+Place your ROM files here.
+
+Supported formats:
+- .nes (Nintendo Entertainment System)
+- .fds (Famicom Disk System)
+
+Example files to test with:
+- Tennis (Japan, USA).nes
+- Any other legally owned ROM files
+
+⚠️  IMPORTANT: Only use ROM files you legally own.
+    No copyrighted ROM files are included with FamiLator.
+
+For testing purposes, you can:
+1. Use public domain homebrew ROMs
+2. Create test ROMs with known text patterns
+3. Use ROMs you have legally obtained
+
+The project includes configuration files for:
+- Tennis (simple fixed-location text)
+- The Legend of Zelda (complex pointer-based text)
+
+Add your ROMs to this directory and update the Taskfile.yml
+TEST_ROM variable to point to your test file.

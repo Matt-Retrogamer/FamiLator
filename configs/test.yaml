@@ -1,0 +1,27 @@
+# Simple test ROM configuration
+game:
+  name: "Test ROM"
+  region: "Test"
+  crc32: "0x00000000"
+
+text_detection:
+  method: "fixed_locations"
+  encoding_table: "tables/tennis.tbl"
+  
+  # Simple text locations for testing
+  strings:
+    - address: 0x100
+      length: 20
+      description: "Game title"
+    - address: 0x200
+      length: 15
+      description: "Player 1"
+    - address: 0x300
+      length: 15
+      description: "Player 2"
+
+pointers:
+  enabled: false
+
+validation:
+  expected_size: 32768

@@ -1,0 +1,17 @@
+# FamiLator - NES/Famicom ROM Translation Tool
+# Production dependencies
+
+# Core dependencies
+PyYAML>=6.0.1          # YAML configuration parsing
+requests>=2.31.0        # HTTP requests for LLM APIs
+
+# Optional dependencies for enhanced functionality
+# numpy>=1.24.0         # Numerical operations (for advanced text detection)
+# Pillow>=10.0.0        # Image processing (for graphics-based text)
+
+# Development dependencies (install with: pip install -e .[dev])
+# pytest>=7.4.0         # Testing framework
+# pytest-cov>=4.1.0     # Test coverage
+# black>=23.7.0         # Code formatting
+# flake8>=6.0.0         # Linting
+# mypy>=1.5.0           # Type checking

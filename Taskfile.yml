@@ -1,0 +1,261 @@
+# FamiLator Task Runner Configuration
+# https://taskfile.dev
+
+version: '3'
+
+vars:
+  PROJECT_NAME: FamiLator
+  PYTHON: ".venv/bin/python"
+  PIP: ".venv/bin/pip"
+  SOURCE_DIR: "src"
+  TEST_DIR: "tests"
+  CONFIG_DIR: "configs"
+  OUTPUT_DIR: "output"
+  TABLES_DIR: "tables"
+  ROMS_DIR: "roms_input"
+  TEST_ROM: "roms_input/test.nes"
+  TEST_CONFIG: "configs/test.yaml"
+
+tasks:
+  # === Environment Setup ===
+  
+  setup:
+    desc: Initial project setup (create venv and install dependencies)
+    cmds:
+      - echo "🚀 Setting up FamiLator development environment..."
+      - python3 -m venv .venv
+      - "{{.PIP}} install --upgrade pip"
+      - "{{.PIP}} install -r requirements.txt"
+      - "{{.PIP}} install -e ."
+      - echo "✅ Environment setup complete!"
+      - echo "💡 Run 'source .venv/bin/activate' to activate the virtual environment"
+
+  install:
+    desc: Install/upgrade dependencies
+    deps: [check-venv]
+    cmds:
+      - "{{.PIP}} install --upgrade pip"
+      - "{{.PIP}} install -r requirements.txt"
+      - "{{.PIP}} install -e ."
+
+  check-venv:
+    desc: Check if virtual environment exists
+    cmds:
+      - test -d .venv || (echo "❌ Virtual environment not found. Run 'task setup' first." && exit 1)
+    silent: true
+
+  # === Core Operations ===
+
+  extract:
+    desc: Extract text from ROM
+    deps: [install]
+    cmds:
+      - echo "📝 Extracting text from ROM..."
+      - "{{.PYTHON}} -m src.extractor {{.CLI_ARGS}}"
+    requires:
+      vars: [CLI_ARGS]
+
+  translate:
+    desc: Translate extracted text
+    deps: [install]
+    cmds:
+      - echo "🌐 Translating text..."
+      - "{{.PYTHON}} -m src.translator_stub {{.CLI_ARGS}}"
+    requires:
+      vars: [CLI_ARGS]
+
+  reinject:
+    desc: Reinject translated text into ROM
+    deps: [install]
+    cmds:
+      - echo "💉 Reinjecting translated text..."
+      - "{{.PYTHON}} -m src.reinjector {{.CLI_ARGS}}"
+    requires:
+      vars: [CLI_ARGS]
+
+  validate:
+    desc: Validate ROM integrity
+    deps: [install]
+    cmds:
+      - echo "🔍 Validating ROM..."
+      - "{{.PYTHON}} -m src.validator {{.CLI_ARGS}}"
+    requires:
+      vars: [CLI_ARGS]
+
+  pipeline:
+    desc: Run full translation pipeline
+    deps: [install]
+    cmds:
+      - echo "🚀 Running complete translation pipeline..."
+      - "{{.PYTHON}} scripts/run_pipeline.py {{.CLI_ARGS}}"
+    requires:
+      vars: [CLI_ARGS]
+
+  # === Testing ===
+
+  test:
+    desc: Run all tests
+    deps: [install]
+    cmds:
+      - echo "🧪 Running tests..."
+      - "{{.PYTHON}} -m pytest {{.TEST_DIR}} -v"
+
+  test-unit:
+    desc: Run unit tests only
+    deps: [install]
+    cmds:
+      - "{{.PYTHON}} -m pytest {{.TEST_DIR}} -v -k 'not integration'"
+
+  test-integration:
+    desc: Run integration tests only
+    deps: [install]
+    cmds:
+      - "{{.PYTHON}} -m pytest {{.TEST_DIR}} -v -k 'integration'"
+
+  test-coverage:
+    desc: Run tests with coverage report
+    deps: [install]
+    cmds:
+      - "{{.PIP}} install coverage"
+      - "{{.PYTHON}} -m coverage run -m pytest {{.TEST_DIR}}"
+      - "{{.PYTHON}} -m coverage report"
+      - "{{.PYTHON}} -m coverage html"
+
+  # === Code Quality ===
+
+  lint:
+    desc: Run linting
+    deps: [install]
+    cmds:
+      - "{{.PIP}} install flake8 black isort"
+      - "{{.PYTHON}} -m flake8 {{.SOURCE_DIR}} {{.TEST_DIR}}"
+
+  format:
+    desc: Format code
+    deps: [install]
+    cmds:
+      - "{{.PIP}} install black isort"
+      - "{{.PYTHON}} -m black {{.SOURCE_DIR}} {{.TEST_DIR}}"
+      - "{{.PYTHON}} -m isort {{.SOURCE_DIR}} {{.TEST_DIR}}"
+
+  quality:
+    desc: Run all quality checks
+    deps: [lint, test]
+
+  # === Analysis ===
+
+  analyze:
+    desc: Analyze ROM structure
+    deps: [install]
+    cmds:
+      - echo "🔬 Analyzing ROM structure..."
+      - "{{.PYTHON}} -m src.detector {{.CLI_ARGS}}"
+    requires:
+      vars: [CLI_ARGS]
+
+  demo:
+    desc: Run demonstration with existing test ROM
+    deps: [install]
+    cmds:
+      - echo "🕹️  FamiLator Demo"
+      - echo "=================="
+      - echo
+      - echo "🚀 Running full translation pipeline with test ROM..."
+      - "{{.PYTHON}} scripts/run_pipeline.py {{.TEST_ROM}} {{.TEST_CONFIG}} --mock-translate"
+      - echo
+      - echo "🎉 Demo complete! Check the {{.OUTPUT_DIR}}/ directory for results."
+      - ls -la {{.OUTPUT_DIR}}/
+
+  show-stats:
+    desc: Show project statistics
+    cmds:
+      - echo "📊 FamiLator Project Statistics"
+      - echo "==============================="
+      - echo
+      - echo "📁 Code files:"
+      - find {{.SOURCE_DIR}} -name "*.py" | wc -l | xargs echo "  Python files:"
+      - find {{.TEST_DIR}} -name "*.py" | wc -l | xargs echo "  Test files:"
+      - echo
+      - echo "📝 Lines of code:"
+      - "find {{.SOURCE_DIR}} -name \"*.py\" -exec wc -l {} + | tail -1 | awk '{print \"  Source: \" $1}'"
+      - "find {{.TEST_DIR}} -name \"*.py\" -exec wc -l {} + | tail -1 | awk '{print \"  Tests: \" $1}'"
+      - echo
+      - echo "🎮 Game configurations:"
+      - ls {{.CONFIG_DIR}}/*.yaml | wc -l | xargs echo "  Config files:"
+      - echo
+      - echo "📚 Encoding tables:"
+      - ls {{.TABLES_DIR}}/*.tbl | wc -l | xargs echo "  Table files:"
+
+  # === Maintenance ===
+
+  clean:
+    desc: Clean generated files
+    cmds:
+      - echo "🧹 Cleaning generated files..."
+      - rm -rf build/ dist/ *.egg-info/
+      - rm -rf {{.OUTPUT_DIR}}/*
+      - find . -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true
+      - find . -name "*.pyc" -delete
+      - rm -rf .coverage htmlcov/
+      - echo "✅ Cleanup complete!"
+
+  clean-all:
+    desc: Clean everything including virtual environment
+    cmds:
+      - task: clean
+      - rm -rf .venv/
+      - echo "✅ Full cleanup complete!"
+
+  # === Documentation ===
+
+  docs:
+    desc: Generate documentation
+    deps: [install]
+    cmds:
+      - "{{.PIP}} install sphinx"
+      - echo "📚 Generating documentation..."
+      - mkdir -p docs
+      - echo "Documentation generation not yet implemented"
+
+  # === Help ===
+
+  help:
+    desc: Show detailed help information
+    cmds:
+      - echo "🎮 FamiLator - NES ROM Translation Tool"
+      - echo "======================================"
+      - echo
+      - echo "🚀 Getting Started:"
+      - echo "  setup       - Initial environment setup"
+      - echo "  demo        - Run demonstration"
+      - echo
+      - echo "🔧 Development:"
+      - echo "  install     - Install dependencies"
+      - echo "  test        - Run tests"  
+      - echo "  pipeline    - Full translation pipeline"
+      - echo
+      - echo "🎯 Core Operations:"
+      - echo "  extract     - Extract text from ROM"
+      - echo "  translate   - Translate extracted text"
+      - echo "  reinject    - Reinject translated text"
+      - echo "  validate    - Validate ROM integrity"
+      - echo
+      - echo "✨ Quality:"
+      - echo "  lint        - Run linting"
+      - echo "  format      - Format code"
+      - echo "  quality     - All quality checks"
+      - echo
+      - echo "🔍 Analysis:"
+      - echo "  analyze     - Analyze ROM structure"
+      - echo "  demo        - Run demonstration"
+      - echo "  show-stats  - Project statistics"
+      - echo
+      - echo "🧹 Maintenance:"
+      - echo "  clean       - Clean generated files"
+      - echo
+      - "echo \"For detailed help run: task --list-all\""
+
+  default:
+    desc: Show help by default
+    cmds:
+      - task: help

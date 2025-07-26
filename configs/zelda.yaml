@@ -1,0 +1,40 @@
+# The Legend of Zelda (USA) Configuration
+game:
+  name: "The Legend of Zelda"
+  region: "USA"
+  crc32: "0x3A168120"  # Example CRC32 - replace with actual
+
+text_detection:
+  method: "pointer_table"
+  encoding_table: "tables/zelda.tbl"
+  
+  # Pointer table configuration
+  pointer_table:
+    address: 0x17B73      # Location of pointer table
+    count: 124           # Number of text pointers
+    format: "little_endian_16bit"
+    base_offset: 0x18000  # Base address for text data
+
+  # Control codes used in Zelda
+  control_codes:
+    0xFE: "<NEWLINE>"
+    0xFD: "<PAUSE>"
+    0xFC: "<PLAYER_NAME>"
+    0xFB: "<ITEM_NAME>"
+    0xFA: "<NUMBER>"
+    0xFF: "<END>"
+
+pointers:
+  enabled: true
+
+validation:
+  expected_size: 131072  # 128KB ROM
+  checksum_offset: 0x1FFFF
+  
+  known_patterns:
+    - address: 0x00
+      bytes: "4E45531A"  # NES header
+      description: "NES header signature"
+    - address: 0x10
+      bytes: "ZELDA"     # Game identifier
+      description: "Game title in ROM"

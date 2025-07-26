@@ -1,0 +1,40 @@
+# Tennis (USA) Configuration
+game:
+  name: "Tennis"
+  region: "USA"
+  crc32: "0x24BCA5B8"  # Example CRC32 - replace with actual
+
+text_detection:
+  method: "fixed_locations"
+  encoding_table: "tables/tennis.tbl"
+  
+  # Known text locations in Tennis ROM
+  strings:
+    - address: 0x8000
+      length: 20
+      description: "Game title screen"
+    - address: 0x8020
+      length: 15
+      description: "Player 1 indicator"
+    - address: 0x8030
+      length: 15
+      description: "Player 2 indicator"
+    - address: 0x8040
+      length: 10
+      description: "Score display"
+    - address: 0x8050
+      length: 12
+      description: "Game over text"
+
+pointers:
+  enabled: false  # Tennis uses fixed locations
+
+validation:
+  expected_size: 32768  # 32KB ROM
+  checksum_offset: 0x7FFF
+  
+  # Known byte patterns for validation
+  known_patterns:
+    - address: 0x00
+      bytes: "4E45531A"  # NES header
+      description: "NES header signature"

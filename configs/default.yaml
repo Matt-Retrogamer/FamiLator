@@ -1,0 +1,24 @@
+# Default detection parameters for unknown ROMs
+game:
+  name: "Unknown Game"
+  region: "Unknown"
+
+text_detection:
+  method: "auto_detect"
+  encoding_table: "tables/common.tbl"
+  
+  # Auto-detection parameters
+  auto_detect:
+    min_string_length: 3
+    max_string_length: 100
+    confidence_threshold: 0.6
+    entropy_min: 2.0
+    entropy_max: 6.0
+    common_char_threshold: 0.4
+
+pointers:
+  enabled: false
+
+validation:
+  # No specific validation for unknown ROMs
+  perform_basic_checks: true
