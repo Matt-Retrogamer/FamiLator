@@ -3,7 +3,6 @@ Tests for encoding table functionality.
 """
 
 import os
-import tempfile
 import unittest
 
 from src.encoding import EncodingTable
@@ -14,29 +13,8 @@ class TestEncodingTable(unittest.TestCase):
 
     def setUp(self):
         """Set up test fixtures."""
-        self.temp_dir = tempfile.mkdtemp()
-
-        # Create test table file
-        self.table_path = os.path.join(self.temp_dir, "test.tbl")
-        with open(self.table_path, "w") as f:
-            f.write(
-                """# Test encoding table
-41=A
-42=B
-43=C
-20= 
-FE=<NEWLINE>
-FF=<END>
-# Multi-byte pattern
-F0XX=<DELAY:XX>
-"""
-            )
-
-    def tearDown(self):
-        """Clean up test fixtures."""
-        import shutil
-
-        shutil.rmtree(self.temp_dir)
+        # Use the test table file in the tests directory
+        self.table_path = os.path.join(os.path.dirname(__file__), "test_table.tbl")
 
     def test_table_loading(self):
         """Test loading table from file."""

@@ -1,0 +1,9 @@
+# Test encoding table
+41=A
+42=B
+43=C
+20= 
+FE=<NEWLINE>
+FF=<END>
+# Multi-byte pattern
+F0XX=<DELAY:XX>

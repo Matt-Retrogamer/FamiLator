@@ -146,7 +146,8 @@ class TranslatorStub:
         # Check length constraints
         if request.max_length and len(translated) > request.max_length:
             warnings.append(
-                f"Translation exceeds max length ({len(translated)} > {request.max_length})"
+                f"Translation exceeds max length "
+                f"({len(translated)} > {request.max_length})"
             )
 
         return TranslationResponse(
@@ -229,7 +230,8 @@ class TranslatorStub:
             Formatted prompt string
         """
         prompt_parts = [
-            f"Translate the following text from {self.source_language} to {self.target_language}.",
+            f"Translate the following text from {self.source_language} "
+            f"to {self.target_language}.",
             "",
         ]
 
@@ -245,7 +247,8 @@ class TranslatorStub:
 
         if request.preserve_formatting:
             constraints.append(
-                "- Preserve any formatting codes in angle brackets (e.g., <NEWLINE>, <END>)"
+                "- Preserve any formatting codes in angle brackets "
+                "(e.g., <NEWLINE>, <END>)"
             )
 
         if request.max_length:
@@ -365,7 +368,9 @@ class TranslatorStub:
             "genre": "unknown",
             "characters": [],
             "terms": {},
-            "style_guide": "Keep translations concise and appropriate for the game's era",
+            "style_guide": (
+                "Keep translations concise and appropriate for the game's era"
+            ),
         }
 
         # Game-specific context could be loaded from a database

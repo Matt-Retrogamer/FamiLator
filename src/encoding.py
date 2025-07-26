@@ -64,8 +64,12 @@ class EncodingTable:
 
         hex_part, char_part = line.split("=", 1)
         hex_part = hex_part.strip()
-        # Don't strip char_part to preserve spaces
+        # Handle inline comments after character mapping
         char_part = char_part.rstrip("\n\r")  # Only remove line endings
+
+        # Remove inline comments but preserve the character mapping
+        if "#" in char_part:
+            char_part = char_part.split("#")[0].rstrip()
 
         # Handle multi-byte patterns (e.g., F0XX=<DELAY:XX>)
         if "XX" in hex_part or "YY" in hex_part:

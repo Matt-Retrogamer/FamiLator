@@ -126,7 +126,8 @@ class TextExtractor:
             expected_crc = int(crc32, 16) if isinstance(crc32, str) else crc32
             if actual_crc != expected_crc:
                 print(
-                    f"Warning: CRC32 mismatch. Expected {expected_crc:08X}, got {actual_crc:08X}"
+                    f"Warning: CRC32 mismatch. Expected {expected_crc:08X}, "
+                    f"got {actual_crc:08X}"
                 )
 
     def _extract_fixed_locations(self, rom_data: bytes) -> List[ExtractedString]:
@@ -242,7 +243,9 @@ class TextExtractor:
                     original_bytes=original_bytes,
                     decoded_text=candidate.sample_text,
                     length=candidate.length,
-                    description=f"Auto-detected (confidence: {candidate.confidence:.2f})",
+                    description=(
+                        f"Auto-detected (confidence: {candidate.confidence:.2f})"
+                    ),
                     string_id=f"auto_{i+1:03d}",
                 )
             )
