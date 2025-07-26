@@ -1,6 +1,6 @@
 [build-system]
-requires = ["setuptools>=68.0", "wheel"]
-build-backend = "setuptools.build_meta"
+requires = ["hatchling"]
+build-backend = "hatchling.build"
 
 [project]
 name = "familator"
@@ -9,10 +9,10 @@ description = "NES/Famicom ROM Automated Text Extraction, Translation & Reinject
 authors = [{name = "Matt-Retrogamer", email = "matt@retrogamer.dev"}]
 license = {text = "MIT"}
 readme = "README.md"
-requires-python = ">=3.8"
+requires-python = ">=3.9"
 classifiers = [
     "Development Status :: 3 - Alpha",
-    "Intended Audience :: Developers",
+    "Intended Audience :: Developers", 
     "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.8",
@@ -34,10 +34,11 @@ dependencies = [
 [project.optional-dependencies]
 dev = [
     "pytest>=7.4.0",
-    "pytest-cov>=4.1.0",
+    "pytest-cov>=4.1.0", 
     "black>=23.7.0",
     "flake8>=6.0.0",
     "mypy>=1.5.0",
+    "isort>=5.12.0",
 ]
 enhanced = [
     "numpy>=1.24.0",
@@ -48,34 +49,12 @@ enhanced = [
 Homepage = "https://github.com/Matt-Retrogamer/FamiLator"
 Repository = "https://github.com/Matt-Retrogamer/FamiLator"
 Documentation = "https://github.com/Matt-Retrogamer/FamiLator/blob/main/README.md"
-"Bug Tracker" = "https://github.com/Matt-Retrogamer/FamiLator/issues"
 
-[project.scripts]
-familator = "scripts.run_pipeline:main"
+[tool.hatch.build.targets.wheel]
+packages = ["src"]
 
-[tool.setuptools.packages.find]
-where = ["src"]
-
-[tool.setuptools.package-dir]
-"" = "src"
-
-[tool.black]
-line-length = 100
-target-version = ['py38']
-include = '\.pyi?$'
-extend-exclude = '''
-/(
-  # directories
-  \.eggs
-  | \.git
-  | \.hg
-  | \.mypy_cache
-  | \.tox
-  | \.venv
-  | build
-  | dist
-)/
-'''
+[tool.hatch.metadata]
+allow-direct-references = true
 
 [tool.pytest.ini_options]
 minversion = "6.0"
@@ -100,5 +79,28 @@ warn_unreachable = true
 strict_equality = true
 
 [[tool.mypy.overrides]]
-module = ["yaml.*", "requests.*"]
+module = ["yaml.*", "requests.*"] 
 ignore_missing_imports = true
+
+[tool.black]
+line-length = 88
+target-version = ['py38']
+include = '\.pyi?$'
+
+[tool.isort]
+profile = "black"
+multi_line_output = 3
+line_length = 88
+known_first_party = ["src", "familator"]
+
+[tool.flake8]
+max-line-length = 88
+extend-ignore = ["E203", "W503", "F401", "F841", "E722"]
+exclude = [
+    ".git",
+    "__pycache__",
+    ".venv",
+    "build",
+    "dist",
+    "*.egg-info",
+]

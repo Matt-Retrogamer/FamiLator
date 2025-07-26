@@ -6,7 +6,7 @@ version: '3'
 vars:
   PROJECT_NAME: FamiLator
   PYTHON: ".venv/bin/python"
-  PIP: ".venv/bin/pip"
+  UV: "uv"
   SOURCE_DIR: "src"
   TEST_DIR: "tests"
   CONFIG_DIR: "configs"
@@ -23,10 +23,7 @@ tasks:
     desc: Initial project setup (create venv and install dependencies)
     cmds:
       - echo "🚀 Setting up FamiLator development environment..."
-      - python3 -m venv .venv
-      - "{{.PIP}} install --upgrade pip"
-      - "{{.PIP}} install -r requirements.txt"
-      - "{{.PIP}} install -e ."
+      - export PATH="$HOME/.local/bin:$PATH" && {{.UV}} sync --extra dev
       - echo "✅ Environment setup complete!"
       - echo "💡 Run 'source .venv/bin/activate' to activate the virtual environment"
 
@@ -34,9 +31,13 @@ tasks:
     desc: Install/upgrade dependencies
     deps: [check-venv]
     cmds:
-      - "{{.PIP}} install --upgrade pip"
-      - "{{.PIP}} install -r requirements.txt"
-      - "{{.PIP}} install -e ."
+      - export PATH="$HOME/.local/bin:$PATH" && {{.UV}} sync
+
+  install-dev:
+    desc: Install development dependencies
+    deps: [check-venv]
+    cmds:
+      - export PATH="$HOME/.local/bin:$PATH" && {{.UV}} sync --extra dev
 
   check-venv:
     desc: Check if virtual environment exists
@@ -95,28 +96,27 @@ tasks:
 
   test:
     desc: Run all tests
-    deps: [install]
+    deps: [install-dev]
     cmds:
       - echo "🧪 Running tests..."
       - "{{.PYTHON}} -m pytest {{.TEST_DIR}} -v"
 
   test-unit:
     desc: Run unit tests only
-    deps: [install]
+    deps: [install-dev]
     cmds:
       - "{{.PYTHON}} -m pytest {{.TEST_DIR}} -v -k 'not integration'"
 
   test-integration:
     desc: Run integration tests only
-    deps: [install]
+    deps: [install-dev]
     cmds:
       - "{{.PYTHON}} -m pytest {{.TEST_DIR}} -v -k 'integration'"
 
   test-coverage:
     desc: Run tests with coverage report
-    deps: [install]
+    deps: [install-dev]
     cmds:
-      - "{{.PIP}} install coverage"
       - "{{.PYTHON}} -m coverage run -m pytest {{.TEST_DIR}}"
       - "{{.PYTHON}} -m coverage report"
       - "{{.PYTHON}} -m coverage html"
@@ -125,22 +125,33 @@ tasks:
 
   lint:
     desc: Run linting
-    deps: [install]
+    deps: [install-dev]
     cmds:
-      - "{{.PIP}} install flake8 black isort"
       - "{{.PYTHON}} -m flake8 {{.SOURCE_DIR}} {{.TEST_DIR}}"
 
   format:
     desc: Format code
-    deps: [install]
+    deps: [install-dev]
     cmds:
-      - "{{.PIP}} install black isort"
       - "{{.PYTHON}} -m black {{.SOURCE_DIR}} {{.TEST_DIR}}"
       - "{{.PYTHON}} -m isort {{.SOURCE_DIR}} {{.TEST_DIR}}"
 
+  format-check:
+    desc: Check code formatting
+    deps: [install-dev]
+    cmds:
+      - "{{.PYTHON}} -m black --check {{.SOURCE_DIR}} {{.TEST_DIR}}"
+      - "{{.PYTHON}} -m isort --check-only {{.SOURCE_DIR}} {{.TEST_DIR}}"
+
+  type-check:
+    desc: Run type checking
+    deps: [install-dev]
+    cmds:
+      - "{{.PYTHON}} -m mypy {{.SOURCE_DIR}}"
+
   quality:
     desc: Run all quality checks
-    deps: [lint, test]
+    deps: [lint, format-check, type-check, test]
 
   # === Analysis ===
 
@@ -210,9 +221,8 @@ tasks:
 
   docs:
     desc: Generate documentation
-    deps: [install]
+    deps: [install-dev]
     cmds:
-      - "{{.PIP}} install sphinx"
       - echo "📚 Generating documentation..."
       - mkdir -p docs
       - echo "Documentation generation not yet implemented"
@@ -231,7 +241,8 @@ tasks:
       - echo
       - echo "🔧 Development:"
       - echo "  install     - Install dependencies"
-      - echo "  test        - Run tests"  
+      - echo "  install-dev - Install development dependencies"  
+      - echo "  test        - Run tests"
       - echo "  pipeline    - Full translation pipeline"
       - echo
       - echo "🎯 Core Operations:"
@@ -243,6 +254,8 @@ tasks:
       - echo "✨ Quality:"
       - echo "  lint        - Run linting"
       - echo "  format      - Format code"
+      - echo "  format-check - Check code formatting"
+      - echo "  type-check  - Run type checking"
       - echo "  quality     - All quality checks"
       - echo
       - echo "🔍 Analysis:"
