@@ -164,18 +164,68 @@ tasks:
     requires:
       vars: [CLI_ARGS]
 
+  # === New Streamlined Commands ===
+
+  tr:
+    desc: "Quick translate: task tr -- game.nes [source] [target]"
+    deps: [install]
+    cmds:
+      - "{{.PYTHON}} -m src.cli translate --rom {{.CLI_ARGS}} --auto --mock"
+
+  translate-rom:
+    desc: Translate ROM with full options
+    deps: [install]
+    cmds:
+      - "{{.PYTHON}} -m src.cli translate {{.CLI_ARGS}}"
+    requires:
+      vars: [CLI_ARGS]
+
+  projects:
+    desc: List all translation projects
+    deps: [install]
+    cmds:
+      - "{{.PYTHON}} -m src.cli list --projects"
+
+  roms:
+    desc: List available ROMs
+    deps: [install]
+    cmds:
+      - "{{.PYTHON}} -m src.cli list --roms"
+
+  project-status:
+    desc: Show status of a project
+    deps: [install]
+    cmds:
+      - "{{.PYTHON}} -m src.cli status --project {{.CLI_ARGS}}"
+    requires:
+      vars: [CLI_ARGS]
+
+  apply-translations:
+    desc: Apply edited translations to ROM
+    deps: [install]
+    cmds:
+      - "{{.PYTHON}} -m src.cli apply --project {{.CLI_ARGS}}"
+    requires:
+      vars: [CLI_ARGS]
+
   demo:
-    desc: Run demonstration with existing test ROM
+    desc: Run demonstration with test ROM (mock translation)
     deps: [install]
     cmds:
       - echo "🕹️  FamiLator Demo"
       - echo "=================="
       - echo
       - echo "🚀 Running full translation pipeline with test ROM..."
-      - "{{.PYTHON}} scripts/run_pipeline.py {{.TEST_ROM}} {{.TEST_CONFIG}} --mock-translate"
+      - "{{.PYTHON}} -m src.cli translate --rom {{.TEST_ROM}} --source Japanese --target English --auto --mock"
       - echo
       - echo "🎉 Demo complete! Check the {{.OUTPUT_DIR}}/ directory for results."
       - ls -la {{.OUTPUT_DIR}}/
+
+  demo-legacy:
+    desc: Run demo with legacy pipeline script
+    deps: [install]
+    cmds:
+      - "{{.PYTHON}} scripts/run_pipeline.py {{.TEST_ROM}} {{.TEST_CONFIG}} --mock-translate"
 
   show-stats:
     desc: Show project statistics
@@ -235,6 +285,17 @@ tasks:
       - echo "🎮 FamiLator - NES ROM Translation Tool"
       - echo "======================================"
       - echo
+      - echo "⚡ QUICK START (new streamlined workflow):"
+      - echo "  task demo                             - Run demo with test ROM"
+      - echo "  task tr -- game.nes                   - Quick translate (auto + mock)"
+      - echo "  task translate-rom -- --rom game.nes --source Japanese --target English"
+      - echo
+      - echo "📁 Project Management:"
+      - echo "  task projects                         - List all projects"
+      - echo "  task roms                             - List available ROMs"
+      - echo "  task project-status -- output/myproj  - Show project status"
+      - echo "  task apply-translations -- output/myproj  - Apply edited translations"
+      - echo
       - echo "🚀 Getting Started:"
       - echo "  setup       - Initial environment setup"
       - echo "  demo        - Run demonstration"
@@ -243,9 +304,9 @@ tasks:
       - echo "  install     - Install dependencies"
       - echo "  install-dev - Install development dependencies"  
       - echo "  test        - Run tests"
-      - echo "  pipeline    - Full translation pipeline"
+      - echo "  pipeline    - Full translation pipeline (legacy)"
       - echo
-      - echo "🎯 Core Operations:"
+      - echo "🎯 Legacy Operations:"
       - echo "  extract     - Extract text from ROM"
       - echo "  translate   - Translate extracted text"
       - echo "  reinject    - Reinject translated text"
@@ -254,19 +315,16 @@ tasks:
       - echo "✨ Quality:"
       - echo "  lint        - Run linting"
       - echo "  format      - Format code"
-      - echo "  format-check - Check code formatting"
       - echo "  type-check  - Run type checking"
       - echo "  quality     - All quality checks"
-      - echo
-      - echo "🔍 Analysis:"
-      - echo "  analyze     - Analyze ROM structure"
-      - echo "  demo        - Run demonstration"
-      - echo "  show-stats  - Project statistics"
       - echo
       - echo "🧹 Maintenance:"
       - echo "  clean       - Clean generated files"
       - echo
-      - "echo \"For detailed help run: task --list-all\""
+      - echo "📖 Direct CLI usage:"
+      - echo "  .venv/bin/familator translate --rom game.nes --source japanese --target english --auto"
+      - echo
+      - "echo \"For all tasks: task --list-all\""
 
   default:
     desc: Show help by default

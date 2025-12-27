@@ -102,10 +102,16 @@ def main():
         # Step 2: Translate text
         print("🤖 Step 2: Translating text...")
         
+        # Build translator config from YAML settings
+        yaml_translation = extractor.config.get('translation', {})
         translator_config = {
             'mock_mode': args.mock_translate,
-            'target_language': args.target_language,
-            'game_context': f"Video game: {game_name}"
+            'target_language': yaml_translation.get('target_language', args.target_language),
+            'source_language': yaml_translation.get('source_language', 'Japanese'),
+            'game_context': yaml_translation.get('game_context', f"Video game: {game_name}"),
+            'model': yaml_translation.get('model', 'llama3'),
+            'base_url': yaml_translation.get('base_url', 'http://localhost:11434'),
+            'temperature': yaml_translation.get('temperature', 0.3),
         }
         
         translator = TranslatorStub(translator_config)

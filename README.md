@@ -16,12 +16,14 @@
 The project supports both simple games (_Tennis_) and complex titles with pointer tables (_The Legend of Zelda_), providing a comprehensive ROM hacking and translation workflow.
 
 ## 🎯 Features
+- ⚡ **One-command workflow** — Select ROM, specify languages, get translated patch automatically
+- 📂 **Project management** — Save/resume projects, track progress, edit and re-apply translations
 - 🧠 **Intelligent text detection** using pattern recognition and configurable encoding tables
 - 📤 **Multi-format export** to structured formats (CSV/JSON) with metadata preservation
-- 🤖 **LLM-powered translation** with constraint validation (OLAMA-ready)
+- 🤖 **LLM-powered translation** with constraint validation (OLLAMA-ready)
 - 📥 **Smart reinsertion** with automatic pointer updates and space optimization
 - 🧪 **Comprehensive testing** including round-trip consistency and ROM integrity validation
-- � **Control code handling** for formatting, colors, and special characters
+- 🎛️ **Control code handling** for formatting, colors, and special characters
 - 📘 **Context-aware translation** using game lore, Wikipedia, and community databases
 - 🎯 **Patch generation** for safe ROM distribution and community sharing
 
@@ -46,6 +48,9 @@ FamiLator/
 │   └── tennis.tbl           # Tennis-specific character table
 ├── src/                      # Core FamiLator modules
 │   ├── __init__.py          # Package initialization
+│   ├── cli.py               # Unified command-line interface
+│   ├── pipeline.py          # Translation pipeline orchestration
+│   ├── project.py           # Project state management
 │   ├── detector.py          # Text detection algorithms (entropy, frequency, terminators)
 │   ├── encoding.py          # Character encoding/decoding with .tbl support
 │   ├── extractor.py         # ROM text extraction with metadata preservation
@@ -119,37 +124,56 @@ scoop install go-task                 # Windows
 
 ## 🚀 Running FamiLator
 
-### Quick Demo
+### ⚡ Quick Start — One Command Translation
 ```bash
-# Run the complete pipeline with test ROM
-task demo
+# Translate any ROM with a single command!
+familator translate --rom game.nes --source japanese --target english --auto
 
-# This will:
-# 1. Extract text from test.nes → output/test_rom_extracted.{csv,json}
-# 2. Generate mock translations → output/test_rom_translated.csv
-# 3. Create translated ROM → output/test_rom_translated.nes
-# 4. Generate IPS patch → output/test_rom_translation.ips
-# 5. Validate integrity → output/test_rom_validation_report.txt
+# Or use the task shortcut
+task tr -- game.nes
 ```
 
-### Individual Commands
+This will automatically:
+1. 📊 Analyze the ROM structure
+2. 📤 Extract all translatable text
+3. 🤖 Translate via LLM (or mock mode)
+4. 📥 Reinject translations into ROM
+5. 🎯 Generate IPS patch for distribution
+6. ✅ Validate ROM integrity
 
-| Command              | Description                                      |
-|----------------------|--------------------------------------------------|
-| `task install-dev`   | Install all dependencies with UV                |
-| `task install`       | Install runtime dependencies only               |
-| `task demo`          | Run complete pipeline with test ROM             |
-| `task extract`       | Extract text from ROM to CSV/JSON               |
-| `task translate`     | Translate extracted text (mock mode)            |
-| `task inject`        | Reinject translated text into ROM               |
-| `task validate`      | Validate ROM integrity and translations         |
-| `task test`          | Run all 15 unit tests                           |
-| `task format`        | Format code with Black and isort                |
-| `task format-check`  | Check code formatting without changes           |
-| `task lint`          | Run flake8 linter                               |
-| `task type-check`    | Run mypy type checking                          |
-| `task clean`         | Clean output files                              |
-| `task list`          | Show all available tasks                        |
+### Demo with Test ROM
+```bash
+# Run demo with included test ROM
+task demo
+
+# Output files in: output/test_en/
+```
+
+### CLI Commands
+
+| Command | Description |
+|---------|-------------|
+| `familator translate --rom X --source X --target X` | Full translation pipeline |
+| `familator extract --rom X` | Extract text only (for manual review) |
+| `familator apply --project X` | Re-apply edited translations |
+| `familator status --project X` | Show project progress |
+| `familator list --projects` | List all translation projects |
+| `familator list --roms` | List available ROMs |
+
+### Task Runner Shortcuts
+
+| Command | Description |
+|---------|-------------|
+| `task demo` | Run demo with test ROM |
+| `task tr -- game.nes` | Quick translate (auto + mock mode) |
+| `task projects` | List all translation projects |
+| `task roms` | List available ROMs |
+| `task project-status -- output/proj` | Show project status |
+| `task apply-translations -- output/proj` | Apply edited translations |
+| `task test` | Run all 15 unit tests |
+| `task format` | Format code with Black and isort |
+| `task lint` | Run flake8 linter |
+| `task clean` | Clean output files |
 
 ### Development Workflow
 ```bash
@@ -169,6 +193,47 @@ task format
 
 # Test full pipeline
 task demo
+```
+
+## 📂 Project Management
+
+FamiLator now supports persistent project management, allowing you to pause and resume translation work.
+
+### Project Structure
+Each translation creates a project folder with:
+```
+output/game_name_en/
+├── project_state.json      # Project status and metadata
+├── project_config.yaml     # Editable configuration
+├── translations.json       # All strings with progress tracking
+├── game_config.yaml        # Auto-generated game settings
+├── game_name_extracted.csv # Extracted text
+├── game_name_translated.csv # Translations (editable!)
+├── game_name_translated.nes # Patched ROM
+└── game_name_translation.ips # IPS patch for distribution
+```
+
+### Resume Interrupted Work
+```bash
+# Check project status
+familator status --project output/my_game_en
+
+# Continue where you left off
+familator translate --rom game.nes --resume
+```
+
+### Edit and Re-apply Translations
+```bash
+# 1. Run initial translation
+familator translate --rom game.nes --source japanese --target english --auto
+
+# 2. Edit the CSV file manually to fix translations
+# Open: output/game_en/game_translated.csv
+
+# 3. Re-apply your edits
+familator apply --project output/game_en
+
+# New ROM and IPS patch are generated with your fixes!
 ```
 
 ## � Test Coverage & Validation
@@ -461,16 +526,23 @@ FamiLator provides rich context to improve translation quality and consistency.
 - ✅ **ROM integrity validation** (CRC32, size checks, headers)
 - ✅ **Configurable game profiles** (Tennis, Zelda, custom configurations)
 
-### 🔄 Phase 5: Community & Enhancement (In Progress)
-- ✅ **CLI with game-specific presets** via task automation
-- ✅ **Patch generation and distribution** (IPS format)
-- 🔄 **Integration with existing ROM hacking tools** (partially complete)
-- 🔄 **Documentation for adding new games** (configuration guides available)
-- 📋 **Web interface** for non-technical users (planned)
-- 📋 **Advanced compression support** (planned)
-- 📋 **Multi-byte character encoding** for Japanese games (planned)
+### ✅ Phase 5: Streamlined Workflow (COMPLETED)
+- ✅ **Unified CLI** (`familator translate/extract/apply/status/list`)
+- ✅ **One-command translation** \u2014 ROM + languages → translated patch
+- ✅ **Project management** \u2014 save/resume projects, track progress
+- ✅ **Edit & re-apply workflow** \u2014 manually refine translations
+- ✅ **Auto-config generation** for unknown ROMs
+- ✅ **Task runner shortcuts** for common operations
 
-## � Quick Start Summary
+### 🔄 Phase 6: Enhanced Detection (In Progress)
+- 📋 **Language-aware text detection** (Japanese vs English patterns)
+- 📋 **Improved LLM translation** with retry logic, batching, and context
+- 📋 **Glossary support** per-project terminology management
+- 📋 **Font compatibility checking** before translation
+- 📋 **CHR ROM analysis** for available character detection
+- 📋 **Web interface** for non-technical users
+
+## 🚀 Quick Start Summary
 
 ```bash
 # 1. Setup with UV (recommended)
@@ -479,17 +551,19 @@ git clone https://github.com/Matt-Retrogamer/FamiLator.git
 cd FamiLator
 task install-dev
 
-# 2. Run complete demo
+# 2. Translate a ROM (one command!)
+familator translate --rom roms_input/game.nes --source japanese --target english --auto
+
+# Or run demo with test ROM
 task demo
 
-# 3. Check results
-ls output/
-# test_rom_extracted.csv      - Extracted text
-# test_rom_extracted.json     - Structured data
-# test_rom_translated.csv     - Translated text
-# test_rom_translated.nes     - Final ROM
-# test_rom_translation.ips    - Distribution patch
-# test_rom_validation_report.txt - Quality report
+# 3. Check your project
+familator list --projects
+familator status --project output/game_en
+
+# 4. Edit translations and re-apply
+# (edit the CSV file manually, then:)
+familator apply --project output/game_en
 ```
 
 **FamiLator is production-ready** with all core features implemented, comprehensive testing, and professional development workflow. Ready for ROM translation projects! 🎯

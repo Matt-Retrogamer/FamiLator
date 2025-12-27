@@ -45,6 +45,9 @@ enhanced = [
     "Pillow>=10.0.0",
 ]
 
+[project.scripts]
+familator = "src.cli:main"
+
 [project.urls]
 Homepage = "https://github.com/Matt-Retrogamer/FamiLator"
 Repository = "https://github.com/Matt-Retrogamer/FamiLator"

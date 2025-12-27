@@ -45,10 +45,10 @@ class TranslatorStub:
         """
         self.config = config or {}
         self.base_url = self.config.get("base_url", "http://localhost:11434")
-        self.model_name = self.config.get("model", "llama2")
+        self.model_name = self.config.get("model", "gpt-oss:20b")
         self.temperature = self.config.get("temperature", 0.3)
-        self.source_language = self.config.get("source_language", "English")
-        self.target_language = self.config.get("target_language", "Spanish")
+        self.source_language = self.config.get("source_language", "Japanese")
+        self.target_language = self.config.get("target_language", "English")
         self.game_context = self.config.get("game_context", "")
 
     def translate_string(self, request: TranslationRequest) -> TranslationResponse:
@@ -115,8 +115,41 @@ class TranslatorStub:
             # Control codes - don't translate
             translated = text
         else:
-            # Simple mock translation
-            mock_translations = {
+            # Japanese to English mock translations (hiragana words)
+            japanese_translations = {
+                # Common game terms
+                "ほ": ".",  # Often used as placeholder/dot in Zelda
+                "へ": "'",  # Apostrophe alternative
+                # Zelda-specific Japanese terms
+                "たから": "treasure",
+                "けん": "sword",
+                "たて": "shield",
+                "ゆみ": "bow",
+                "や": "arrow",
+                "ばくだん": "bomb",
+                "かぎ": "key",
+                "ちず": "map",
+                "こころ": "heart",
+                "いのち": "life",
+                "ちから": "power",
+                "まほう": "magic",
+                "ゆびわ": "ring",
+                "ろうそく": "candle",
+                "ふえ": "recorder",
+                "いかだ": "raft",
+                "はしご": "ladder",
+                "ブーメラン": "boomerang",
+                "ルピー": "rupee",
+                "トライフォース": "triforce",
+                # Staff/credits
+                "せいさく": "production",
+                "おんがく": "music",
+                "プログラム": "program",
+                "デザイン": "design",
+            }
+            
+            # Simple mock translation for English
+            english_translations = {
                 "START": "INICIO",
                 "GAME": "JUEGO",
                 "PLAYER": "JUGADOR",
@@ -131,17 +164,36 @@ class TranslatorStub:
                 "SELECT": "SELECCIONAR",
             }
 
-            translated = text.upper()
-            for eng, esp in mock_translations.items():
-                translated = translated.replace(eng, esp)
-
-            # Preserve case pattern
-            if text.islower():
-                translated = translated.lower()
-            elif text.isupper():
-                translated = translated.upper()
-            elif text.istitle():
-                translated = translated.title()
+            translated = text
+            
+            # Check if text contains Japanese characters
+            has_japanese = any(
+                '\u3040' <= c <= '\u309F' or  # Hiragana
+                '\u30A0' <= c <= '\u30FF'     # Katakana
+                for c in text
+            )
+            
+            if has_japanese:
+                # Apply Japanese translations
+                for jp, en in japanese_translations.items():
+                    translated = translated.replace(jp, en)
+                # Clean up remaining hiragana with placeholder
+                import re
+                # Replace remaining Japanese with [JP] marker for visibility
+                translated = re.sub(r'[\u3040-\u309F\u30A0-\u30FF]+', '[JP]', translated)
+            else:
+                # Apply English translations (for Spanish target)
+                translated = text.upper()
+                for eng, esp in english_translations.items():
+                    translated = translated.replace(eng, esp)
+                
+                # Preserve case pattern
+                if text.islower():
+                    translated = translated.lower()
+                elif text.isupper():
+                    translated = translated.upper()
+                elif text.istitle():
+                    translated = translated.title()
 
         # Check length constraints
         if request.max_length and len(translated) > request.max_length:
@@ -153,7 +205,7 @@ class TranslatorStub:
         return TranslationResponse(
             original_text=text,
             translated_text=translated,
-            confidence=0.8,  # Mock confidence
+            confidence=0.8 if not any('\u3040' <= c <= '\u30FF' for c in text) else 0.6,
             warnings=warnings,
             metadata={"method": "mock", "model": "mock_translator"},
         )
@@ -180,7 +232,7 @@ class TranslatorStub:
 
         try:
             response = requests.post(
-                f"{self.base_url}/api/generate", json=payload, timeout=30
+                f"{self.base_url}/api/generate", json=payload, timeout=120
             )
             response.raise_for_status()
 
@@ -229,44 +281,38 @@ class TranslatorStub:
         Returns:
             Formatted prompt string
         """
+        # Build a strict, focused prompt that discourages explanations
         prompt_parts = [
-            f"Translate the following text from {self.source_language} "
-            f"to {self.target_language}.",
+            "You are a professional video game translator. Your task is to translate text for a retro NES/Famicom game.",
             "",
+            "CRITICAL RULES:",
+            "1. Output ONLY the translated text, nothing else",
+            "2. NO explanations, NO notes, NO comments, NO parentheses with extra info",
+            "3. NO phrases like 'Translation:', 'Here is', 'Note:', etc.",
+            "4. Keep the translation SHORT - this is for a retro game with limited space",
+            "5. If you see control codes like <MSG_0A> or <END>, keep them exactly as-is",
+            "6. Use simple, concise language appropriate for 1980s video games",
+            "",
+            f"Source language: {self.source_language}",
+            f"Target language: {self.target_language}",
         ]
 
         if self.game_context:
-            prompt_parts.extend(
-                [f"Context: This text is from a video game: {self.game_context}", ""]
-            )
-
-        if request.context:
-            prompt_parts.extend([f"Additional context: {request.context}", ""])
-
-        constraints = []
-
-        if request.preserve_formatting:
-            constraints.append(
-                "- Preserve any formatting codes in angle brackets "
-                "(e.g., <NEWLINE>, <END>)"
-            )
+            prompt_parts.extend(["", f"Game: {self.game_context}"])
 
         if request.max_length:
-            constraints.append(
-                f"- Keep translation under {request.max_length} characters"
-            )
+            prompt_parts.extend([
+                "",
+                f"MAXIMUM LENGTH: {request.max_length} characters (this is a hard limit)"
+            ])
 
-        constraints.extend(
-            [
-                "- Maintain the tone and style appropriate for a video game",
-                "- Only provide the translation, no explanations",
-            ]
-        )
-
-        if constraints:
-            prompt_parts.extend(["Constraints:", *constraints, ""])
-
-        prompt_parts.extend([f"Text to translate: {request.text}", "", "Translation:"])
+        # Add the text to translate with clear delimiters
+        prompt_parts.extend([
+            "",
+            "---INPUT---",
+            request.text,
+            "---OUTPUT---"
+        ])
 
         return "\n".join(prompt_parts)
 
@@ -279,28 +325,83 @@ class TranslatorStub:
         Returns:
             Cleaned translation text
         """
-        # Remove common prefixes/suffixes that LLMs might add
+        import re
+        
         response = llm_response.strip()
-
+        
+        # If response contains our output delimiter, extract only that part
+        if "---OUTPUT---" in response:
+            response = response.split("---OUTPUT---")[-1].strip()
+        
+        # Take only the first line if multiple lines (often the actual translation)
+        lines = response.split("\n")
+        
+        # Filter out lines that look like comments/explanations
+        clean_lines = []
+        for line in lines:
+            line = line.strip()
+            # Skip empty lines at the start
+            if not line and not clean_lines:
+                continue
+            # Skip lines that look like explanations
+            skip_patterns = [
+                r'^\(.*\)$',  # Lines that are entirely in parentheses
+                r'^Note:',
+                r'^Translation:',
+                r'^Here is',
+                r'^The translation',
+                r'^This means',
+                r'^In English',
+                r'^Translated:',
+                r'^---',
+                r'^\*\*',  # Markdown bold
+                r'^Remember',
+                r'^I\'ve ',
+                r'^I have ',
+            ]
+            if any(re.match(pattern, line, re.IGNORECASE) for pattern in skip_patterns):
+                continue
+            # Skip lines with common LLM chattiness
+            if any(phrase in line.lower() for phrase in [
+                'keep in mind', 'please note', 'i hope', 'let me know',
+                'here\'s', 'above translation', 'the above', 'as requested'
+            ]):
+                continue
+            clean_lines.append(line)
+        
+        # If we filtered everything, fall back to first non-empty line
+        if not clean_lines:
+            for line in lines:
+                if line.strip():
+                    clean_lines = [line.strip()]
+                    break
+        
+        response = clean_lines[0] if clean_lines else response
+        
         # Remove quotes if the entire response is quoted
         if (response.startswith('"') and response.endswith('"')) or (
             response.startswith("'") and response.endswith("'")
         ):
             response = response[1:-1]
-
-        # Remove explanation prefixes
+        
+        # Remove common prefixes
         prefixes_to_remove = [
-            "Translation:",
-            "The translation is:",
-            "Here is the translation:",
-            "Translated text:",
+            "Translation:", "Output:", "Result:",
+            "The translation is:", "Here is the translation:",
+            "Translated text:", "English:", "Spanish:",
         ]
-
         for prefix in prefixes_to_remove:
             if response.lower().startswith(prefix.lower()):
-                response = response[len(prefix) :].strip()
-
-        return response
+                response = response[len(prefix):].strip()
+        
+        # Remove trailing explanations in parentheses
+        response = re.sub(r'\s*\([^)]*\)\s*$', '', response)
+        
+        # Remove any remaining markdown or special formatting
+        response = re.sub(r'\*\*([^*]+)\*\*', r'\1', response)  # Remove **bold**
+        response = re.sub(r'\*([^*]+)\*', r'\1', response)  # Remove *italic*
+        
+        return response.strip()
 
     def _check_formatting_preserved(self, original: str, translated: str) -> bool:
         """Check if formatting codes are preserved in translation.
