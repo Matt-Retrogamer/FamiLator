@@ -1,0 +1,154 @@
+{% extends "base.html" %}
+
+{% block title %}Upload ROM - FamiLator{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header">
+                    <h4 class="mb-0">
+                        <i class="bi bi-upload"></i> Upload ROM File
+                    </h4>
+                </div>
+                <div class="card-body">
+                    <form method="post" enctype="multipart/form-data" id="uploadForm">
+                        <div class="mb-4">
+                            <label class="form-label">Select ROM File</label>
+                            <div class="drop-zone" id="dropZone">
+                                <div class="drop-zone-content">
+                                    <i class="bi bi-cloud-upload display-3 text-muted"></i>
+                                    <p class="mt-2">Drag & drop your ROM file here</p>
+                                    <p class="text-muted small">or click to browse</p>
+                                    <input type="file" name="rom_file" id="romFile" 
+                                           accept=".nes,.fds" class="d-none">
+                                </div>
+                                <div class="file-info d-none" id="fileInfo">
+                                    <i class="bi bi-file-earmark-binary display-3 text-danger"></i>
+                                    <p class="mt-2 mb-0" id="fileName">filename.nes</p>
+                                    <small class="text-muted" id="fileSize">0 KB</small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="d-flex justify-content-between">
+                            <a href="{{ url_for('main.index') }}" class="btn btn-outline-secondary">
+                                <i class="bi bi-arrow-left"></i> Back
+                            </a>
+                            <button type="submit" class="btn btn-nes" id="uploadBtn" disabled>
+                                <i class="bi bi-upload"></i> Upload & Analyze
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Supported Formats -->
+            <div class="card mt-4">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-info-circle"></i> Supported Formats</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6><i class="bi bi-file-earmark-binary text-danger"></i> NES ROM (.nes)</h6>
+                            <p class="text-muted small">
+                                Standard NES ROM format with iNES header. 
+                                Supports mappers 0-4 for most games.
+                            </p>
+                        </div>
+                        <div class="col-md-6">
+                            <h6><i class="bi bi-file-earmark-binary text-warning"></i> FDS ROM (.fds)</h6>
+                            <p class="text-muted small">
+                                Famicom Disk System format. 
+                                Some extraction features may be limited.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    .drop-zone {
+        border: 3px dashed #0f3460;
+        border-radius: 10px;
+        padding: 40px;
+        text-align: center;
+        cursor: pointer;
+        transition: all 0.3s;
+    }
+    
+    .drop-zone:hover, .drop-zone.drag-over {
+        border-color: var(--nes-red);
+        background-color: rgba(230, 0, 18, 0.1);
+    }
+    
+    .drop-zone.has-file {
+        border-style: solid;
+        border-color: var(--nes-red);
+    }
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    const dropZone = document.getElementById('dropZone');
+    const fileInput = document.getElementById('romFile');
+    const fileInfo = document.getElementById('fileInfo');
+    const dropZoneContent = document.querySelector('.drop-zone-content');
+    const uploadBtn = document.getElementById('uploadBtn');
+    
+    // Click to browse
+    dropZone.addEventListener('click', () => fileInput.click());
+    
+    // Drag events
+    dropZone.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        dropZone.classList.add('drag-over');
+    });
+    
+    dropZone.addEventListener('dragleave', () => {
+        dropZone.classList.remove('drag-over');
+    });
+    
+    dropZone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        dropZone.classList.remove('drag-over');
+        
+        const files = e.dataTransfer.files;
+        if (files.length > 0) {
+            fileInput.files = files;
+            updateFileInfo(files[0]);
+        }
+    });
+    
+    // File selection
+    fileInput.addEventListener('change', () => {
+        if (fileInput.files.length > 0) {
+            updateFileInfo(fileInput.files[0]);
+        }
+    });
+    
+    function updateFileInfo(file) {
+        document.getElementById('fileName').textContent = file.name;
+        document.getElementById('fileSize').textContent = 
+            (file.size / 1024).toFixed(1) + ' KB';
+        
+        dropZoneContent.classList.add('d-none');
+        fileInfo.classList.remove('d-none');
+        dropZone.classList.add('has-file');
+        uploadBtn.disabled = false;
+    }
+    
+    // Form submission
+    document.getElementById('uploadForm').addEventListener('submit', () => {
+        showLoading('Uploading ROM...');
+    });
+</script>
+{% endblock %}

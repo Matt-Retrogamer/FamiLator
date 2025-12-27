@@ -1,0 +1,226 @@
+{% extends "base.html" %}
+
+{% block title %}FamiLator - NES/Famicom ROM Translation Tool{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <!-- Hero Section -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-body text-center py-5">
+                    <h1 class="display-4 mb-3">
+                        <i class="bi bi-controller text-danger"></i>
+                        Welcome to FamiLator
+                    </h1>
+                    <p class="lead text-muted">
+                        The complete NES/Famicom ROM translation toolkit. 
+                        Extract text, translate, and reinject with ease.
+                    </p>
+                    <div class="mt-4">
+                        <a href="{{ url_for('main.upload') }}" class="btn btn-nes btn-lg me-2">
+                            <i class="bi bi-upload"></i> Upload ROM
+                        </a>
+                        <a href="{{ url_for('projects.new_project') }}" class="btn btn-outline-nes btn-lg">
+                            <i class="bi bi-plus-circle"></i> New Project
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Quick Stats -->
+        <div class="col-md-4 mb-4">
+            <div class="card h-100">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-bar-chart"></i> Quick Stats</h5>
+                </div>
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <span>Total Projects</span>
+                        <span class="badge bg-primary">{{ projects|length }}</span>
+                    </div>
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <span>ROMs Available</span>
+                        <span class="badge bg-info">{{ rom_files|length }}</span>
+                    </div>
+                    <div class="d-flex justify-content-between align-items-center">
+                        <span>Translations Complete</span>
+                        <span class="badge bg-success">
+                            {{ projects|selectattr('files.patches', 'gt', 0)|list|length }}
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Recent Projects -->
+        <div class="col-md-8 mb-4">
+            <div class="card h-100">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="bi bi-folder-fill"></i> Recent Projects</h5>
+                    <a href="{{ url_for('projects.list_projects') }}" class="btn btn-sm btn-outline-light">
+                        View All
+                    </a>
+                </div>
+                <div class="card-body">
+                    {% if projects %}
+                        <div class="table-responsive">
+                            <table class="table table-dark table-hover mb-0">
+                                <thead>
+                                    <tr>
+                                        <th>Project</th>
+                                        <th>Extracted</th>
+                                        <th>Translated</th>
+                                        <th>Patches</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for project in projects[:5] %}
+                                    <tr>
+                                        <td>
+                                            <i class="bi bi-folder2-open text-warning"></i>
+                                            {{ project.name }}
+                                        </td>
+                                        <td>
+                                            {% if project.files.extracted %}
+                                                <span class="badge bg-success">✓</span>
+                                            {% else %}
+                                                <span class="badge bg-secondary">-</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            {% if project.files.translated %}
+                                                <span class="badge bg-success">✓</span>
+                                            {% else %}
+                                                <span class="badge bg-secondary">-</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            {% if project.files.patches %}
+                                                <span class="badge bg-success">✓</span>
+                                            {% else %}
+                                                <span class="badge bg-secondary">-</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            <a href="{{ url_for('main.translate', project_name=project.name) }}" 
+                                               class="btn btn-sm btn-outline-light">
+                                                <i class="bi bi-pencil"></i> Edit
+                                            </a>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <div class="text-center py-4">
+                            <i class="bi bi-inbox display-4 text-muted"></i>
+                            <p class="text-muted mt-2">No projects yet. Upload a ROM to get started!</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Workflow Steps -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-signpost-2"></i> Translation Workflow</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-3 text-center mb-3">
+                            <div class="p-3">
+                                <div class="display-4 text-danger mb-2">
+                                    <i class="bi bi-upload"></i>
+                                </div>
+                                <h5>1. Upload ROM</h5>
+                                <p class="text-muted small">
+                                    Upload your NES/Famicom ROM file (.nes or .fds)
+                                </p>
+                            </div>
+                        </div>
+                        <div class="col-md-3 text-center mb-3">
+                            <div class="p-3">
+                                <div class="display-4 text-warning mb-2">
+                                    <i class="bi bi-file-text"></i>
+                                </div>
+                                <h5>2. Extract Text</h5>
+                                <p class="text-muted small">
+                                    Automatically extract Japanese text strings
+                                </p>
+                            </div>
+                        </div>
+                        <div class="col-md-3 text-center mb-3">
+                            <div class="p-3">
+                                <div class="display-4 text-info mb-2">
+                                    <i class="bi bi-translate"></i>
+                                </div>
+                                <h5>3. Translate</h5>
+                                <p class="text-muted small">
+                                    Translate text with AI assistance or manually
+                                </p>
+                            </div>
+                        </div>
+                        <div class="col-md-3 text-center mb-3">
+                            <div class="p-3">
+                                <div class="display-4 text-success mb-2">
+                                    <i class="bi bi-box-seam"></i>
+                                </div>
+                                <h5>4. Build Patch</h5>
+                                <p class="text-muted small">
+                                    Generate IPS patch or patched ROM file
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Available ROMs -->
+    {% if rom_files %}
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-disc"></i> Available ROMs</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        {% for rom in rom_files %}
+                        <div class="col-md-4 mb-3">
+                            <div class="card bg-dark">
+                                <div class="card-body d-flex align-items-center">
+                                    <i class="bi bi-file-earmark-binary display-6 text-danger me-3"></i>
+                                    <div class="flex-grow-1">
+                                        <h6 class="mb-1">{{ rom.name }}</h6>
+                                        <small class="text-muted">
+                                            {{ (rom.stat().st_size / 1024)|round(1) }} KB
+                                        </small>
+                                    </div>
+                                    <a href="{{ url_for('main.analyze', filename=rom.name) }}" 
+                                       class="btn btn-sm btn-outline-nes">
+                                        Analyze
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

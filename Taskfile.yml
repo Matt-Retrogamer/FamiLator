@@ -227,6 +227,24 @@ tasks:
     cmds:
       - "{{.PYTHON}} scripts/run_pipeline.py {{.TEST_ROM}} {{.TEST_CONFIG}} --mock-translate"
 
+  # === Web Interface ===
+
+  web:
+    desc: "Start the web interface (default: http://127.0.0.1:5000)"
+    deps: [install]
+    cmds:
+      - echo "🌐 Starting FamiLator Web Interface..."
+      - "{{.PYTHON}} scripts/run_web.py {{.CLI_ARGS}}"
+
+  web-dev:
+    desc: Start web interface in debug mode with auto-reload
+    deps: [install-dev]
+    cmds:
+      - echo "🌐 Starting FamiLator Web Interface (debug mode)..."
+      - "{{.PYTHON}} scripts/run_web.py --debug"
+
+  # === Statistics ===
+
   show-stats:
     desc: Show project statistics
     cmds:

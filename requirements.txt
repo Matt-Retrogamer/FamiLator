@@ -4,6 +4,8 @@
 # Core dependencies
 PyYAML>=6.0.1          # YAML configuration parsing
 requests>=2.31.0        # HTTP requests for LLM APIs
+Flask>=3.0.0           # Web interface framework
+Werkzeug>=3.0.0        # WSGI utilities
 
 # Optional dependencies for enhanced functionality
 # numpy>=1.24.0         # Numerical operations (for advanced text detection)

@@ -7,7 +7,7 @@
 [![Repo](https://img.shields.io/badge/github-Matt--Retrogamer%2FFamiLator-blue?logo=github)](https://github.com/Matt-Retrogamer/FamiLator)
 [![Python](https://img.shields.io/badge/python-3.9+-blue.svg)](https://python.org)
 [![UV](https://img.shields.io/badge/package%20manager-UV-blue)](https://github.com/astral-sh/uv)
-[![Tests](https://img.shields.io/badge/tests-15%20passing-green)](tests/)
+[![Tests](https://img.shields.io/badge/tests-144%20passing-green)](tests/)
 
 
 ## 🕹️ Project Overview
@@ -66,12 +66,18 @@ FamiLator/
 │   ├── translator.py        # Enhanced LLM translation with glossary & memory
 │   ├── translator_stub.py   # OLLAMA LLM integration and mock translation (legacy)
 │   └── validator.py         # ROM integrity and translation validation
-├── tests/                    # Comprehensive test suite (15 tests)
-│   ├── test_encoding.py     # Encoding/decoding tests
-│   ├── test_extractor.py    # Text extraction tests
-│   └── test_reinjector.py   # Reinsertion and validation tests
+├── tests/                    # Comprehensive test suite (144 tests)
+│   ├── test_encoding.py          # Encoding/decoding tests
+│   ├── test_extractor.py         # Text extraction tests
+│   ├── test_reinjector.py        # Reinsertion and validation tests
+│   ├── test_language_detector.py # Language detection tests
+│   ├── test_translator.py        # Translation & glossary tests
+│   ├── test_chr_analyzer.py      # CHR ROM analysis tests
+│   ├── test_font_checker.py      # Font compatibility tests
+│   └── test_web.py               # Web interface tests
 ├── scripts/                  # Automation and pipeline scripts
-│   └── run_pipeline.py      # Complete extraction → translation → reinsertion workflow
+│   ├── run_pipeline.py      # Complete extraction → translation → reinsertion workflow
+│   └── run_web.py           # Web interface server
 ├── output/                   # Generated files and results
 │   ├── test_rom_extracted.csv        # Extracted text in CSV format
 │   ├── test_rom_extracted.json       # Extracted text in JSON format
@@ -173,12 +179,14 @@ task demo
 | Command | Description |
 |---------|-------------|
 | `task demo` | Run demo with test ROM |
+| `task web` | Start web interface (http://127.0.0.1:5000) |
+| `task web-dev` | Start web interface in debug mode |
 | `task tr -- game.nes` | Quick translate (auto + mock mode) |
 | `task projects` | List all translation projects |
 | `task roms` | List available ROMs |
 | `task project-status -- output/proj` | Show project status |
 | `task apply-translations -- output/proj` | Apply edited translations |
-| `task test` | Run all 15 unit tests |
+| `task test` | Run all 144 unit tests |
 | `task format` | Format code with Black and isort |
 | `task lint` | Run flake8 linter |
 | `task clean` | Clean output files |
@@ -201,6 +209,68 @@ task format
 
 # Test full pipeline
 task demo
+```
+
+## 🌐 Web Interface
+
+FamiLator includes a browser-based interface for users who prefer a visual workflow over the command line.
+
+### Starting the Web Server
+```bash
+# Start web interface (default: http://127.0.0.1:5000)
+task web
+
+# Start in debug mode with auto-reload
+task web-dev
+
+# Or with custom host/port
+python scripts/run_web.py --host 0.0.0.0 --port 8080
+```
+
+### Web UI Features
+
+| Feature | Description |
+|---------|-------------|
+| **Dashboard** | Project overview, quick stats, available ROMs |
+| **ROM Upload** | Drag & drop upload with file validation (.nes, .fds) |
+| **ROM Analysis** | CHR tile analysis, language detection, font regions |
+| **Translation Editor** | Real-time editing with auto-save, length validation, progress tracking |
+| **Tile Browser** | Visual CHR grid with zoom, palette options, font region highlighting |
+| **Project Management** | Create, edit, delete projects; download outputs (CSV, IPS, ROM) |
+
+### Web Workflow
+1. **Upload ROM** — Drag & drop or browse for your .nes file
+2. **Analyze** — View CHR tiles, detected language, font availability
+3. **Create Project** — Set project name and character table
+4. **Translate** — Edit strings in the interactive editor
+5. **Build Patch** — Generate IPS patch and translated ROM
+6. **Download** — Get your translated ROM or IPS patch
+
+### REST API Endpoints
+
+The web interface exposes a REST API for programmatic access:
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/extract` | POST | Extract text from ROM |
+| `/api/translate` | POST | Auto-translate extracted strings |
+| `/api/save_translation` | POST | Save individual translation edit |
+| `/api/check_font` | POST | Check font compatibility |
+| `/api/build_patch` | POST | Build IPS patch from translations |
+| `/api/validate` | POST | Validate translated ROM |
+| `/api/chr_tiles/<filename>` | GET | Get CHR tile metadata |
+
+### Example API Usage
+```bash
+# Extract text from ROM
+curl -X POST http://localhost:5000/api/extract \
+  -H "Content-Type: application/json" \
+  -d '{"rom_filename": "game.nes", "output_name": "my_project"}'
+
+# Check font compatibility
+curl -X POST http://localhost:5000/api/check_font \
+  -H "Content-Type: application/json" \
+  -d '{"text": "Hello World!", "table_file": "tables/common.tbl"}'
 ```
 
 ## 📂 Project Management
@@ -250,18 +320,20 @@ familator apply --project output/game_en
 
 FamiLator includes comprehensive testing to ensure reliability and data integrity.
 
-### Test Suite (15 Tests - All Passing ✅)
+### Test Suite (144 Tests - All Passing ✅)
 ```bash
 # Run all tests
 task test
 
-# Tests include:
-# - Encoding/decoding with various character tables
-# - Text extraction from different ROM formats  
-# - Pointer table manipulation and updates
-# - Translation workflow validation
-# - ROM integrity verification
-# - Round-trip consistency checks
+# Test coverage by module:
+# - test_encoding.py (6 tests)     — Character encoding/decoding
+# - test_extractor.py (5 tests)    — Text extraction from ROMs
+# - test_reinjector.py (11 tests)  — Reinsertion, IPS patches, round-trip
+# - test_language_detector.py (19) — Japanese/English detection
+# - test_translator.py (26 tests)  — Translation, glossary, memory
+# - test_chr_analyzer.py (25)      — CHR ROM tile analysis
+# - test_font_checker.py (28)      — Font compatibility validation
+# - test_web.py (24 tests)         — Web interface routes & API
 ```
 
 ### Validation Features
@@ -559,13 +631,39 @@ FamiLator provides rich context to improve translation quality and consistency.
 - ✅ **Auto-substitution** — replace incompatible characters (accents, symbols, punctuation)
 - ✅ **Character mapping report** — identify missing glyphs with suggestions
 
-### 🔄 Phase 8: Web Interface (Planned)
-- 📋 **Web-based UI** for non-technical users
-- 📋 **Visual tile/font browser**
-- 📋 **Interactive translation editor**
-- 📋 **Project sharing and collaboration**
+### ✅ Phase 8: Web Interface (COMPLETED)
+- ✅ **Web-based UI** — Flask-powered interface for browser-based workflow
+- ✅ **Visual tile/font browser** — CHR tile grid with zoom, palettes, font region navigation
+- ✅ **Interactive translation editor** — Real-time editing, auto-save, length validation
+- ✅ **Project management UI** — Create, edit, delete projects from browser
+- ✅ **ROM analysis dashboard** — Language detection, CHR analysis, font compatibility
+- ✅ **REST API** — Programmatic access to all FamiLator features
 
-## 🚀 Quick Start Summary
+## � TODO / Roadmap
+
+Future enhancements and planned features for upcoming development sessions:
+
+### 🔴 Priority 1: Production Readiness
+- [ ] **Real LLM Integration** — Replace mock translator with actual OpenAI/Claude/OLLAMA API calls
+- [ ] **Error Handling Improvements** — Better error messages and recovery in web UI
+- [ ] **Output Path Fixes** — Web routes look in wrong paths for some operations
+
+### 🟠 Priority 2: Core Features
+- [ ] **Pointer Table Auto-Detection** — Automatically find and rewrite pointer tables
+- [ ] **Font Injection** — Inject custom fonts into CHR ROM for extended character support
+- [ ] **Compression Support** — Handle RLE, LZ, and other compression schemes in advanced ROMs
+
+### 🟡 Priority 3: User Experience
+- [ ] **Emulator Integration** — Test translations directly in embedded emulator
+- [ ] **Progress Persistence** — Save/restore web editor state across sessions
+- [ ] **Batch ROM Processing** — Process multiple ROMs in one operation
+
+### 🟢 Priority 4: Community Features
+- [ ] **BPS Patch Support** — Support BPS format alongside IPS patches
+- [ ] **Translation Sharing** — Export/import translation projects for collaboration
+- [ ] **Documentation Site** — Comprehensive user guide and API documentation
+
+## �🚀 Quick Start Summary
 
 ```bash
 # 1. Setup with UV (recommended)

@@ -1,0 +1,132 @@
+{% extends "base.html" %}
+
+{% block title %}Projects - FamiLator{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2><i class="bi bi-folder-fill text-warning"></i> Projects</h2>
+        <a href="{{ url_for('projects.new_project') }}" class="btn btn-nes">
+            <i class="bi bi-plus-circle"></i> New Project
+        </a>
+    </div>
+
+    {% if projects %}
+    <div class="row">
+        {% for project in projects %}
+        <div class="col-md-6 col-lg-4 mb-4">
+            <div class="card h-100">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">
+                        <i class="bi bi-folder2-open text-warning"></i>
+                        {{ project.name }}
+                    </h5>
+                    <div class="dropdown">
+                        <button class="btn btn-sm btn-outline-secondary" data-bs-toggle="dropdown">
+                            <i class="bi bi-three-dots-vertical"></i>
+                        </button>
+                        <ul class="dropdown-menu dropdown-menu-dark dropdown-menu-end">
+                            <li>
+                                <a class="dropdown-item" href="{{ url_for('projects.download_file', project_name=project.name, file_type='json') }}">
+                                    <i class="bi bi-download"></i> Download JSON
+                                </a>
+                            </li>
+                            <li>
+                                <a class="dropdown-item" href="{{ url_for('projects.download_file', project_name=project.name, file_type='csv') }}">
+                                    <i class="bi bi-download"></i> Download CSV
+                                </a>
+                            </li>
+                            {% if project.files.patches %}
+                            <li>
+                                <a class="dropdown-item" href="{{ url_for('projects.download_file', project_name=project.name, file_type='ips') }}">
+                                    <i class="bi bi-download"></i> Download IPS Patch
+                                </a>
+                            </li>
+                            <li>
+                                <a class="dropdown-item" href="{{ url_for('projects.download_file', project_name=project.name, file_type='rom') }}">
+                                    <i class="bi bi-download"></i> Download Patched ROM
+                                </a>
+                            </li>
+                            {% endif %}
+                            <li><hr class="dropdown-divider"></li>
+                            <li>
+                                <form action="{{ url_for('projects.delete_project', project_name=project.name) }}" 
+                                      method="post" class="d-inline"
+                                      onsubmit="return confirm('Delete project {{ project.name }}?');">
+                                    <button type="submit" class="dropdown-item text-danger">
+                                        <i class="bi bi-trash"></i> Delete Project
+                                    </button>
+                                </form>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <div class="d-flex justify-content-between mb-2">
+                            <span class="text-muted">Progress</span>
+                            <span>
+                                {% if project.files.patches %}
+                                    <span class="badge bg-success">Complete</span>
+                                {% elif project.files.translated %}
+                                    <span class="badge bg-info">Translated</span>
+                                {% else %}
+                                    <span class="badge bg-warning">Extracted</span>
+                                {% endif %}
+                            </span>
+                        </div>
+                        <div class="progress" style="height: 8px;">
+                            {% set progress = 33 if project.files.extracted else 0 %}
+                            {% set progress = 66 if project.files.translated else progress %}
+                            {% set progress = 100 if project.files.patches else progress %}
+                            <div class="progress-bar 
+                                {% if progress == 100 %}bg-success{% elif progress > 50 %}bg-info{% else %}bg-warning{% endif %}" 
+                                 style="width: {{ progress }}%"></div>
+                        </div>
+                    </div>
+                    
+                    <div class="row text-center small">
+                        <div class="col-4">
+                            <div class="{% if project.files.extracted %}text-success{% else %}text-muted{% endif %}">
+                                <i class="bi bi-{% if project.files.extracted %}check-circle-fill{% else %}circle{% endif %}"></i>
+                                Extracted
+                            </div>
+                        </div>
+                        <div class="col-4">
+                            <div class="{% if project.files.translated %}text-success{% else %}text-muted{% endif %}">
+                                <i class="bi bi-{% if project.files.translated %}check-circle-fill{% else %}circle{% endif %}"></i>
+                                Translated
+                            </div>
+                        </div>
+                        <div class="col-4">
+                            <div class="{% if project.files.patches %}text-success{% else %}text-muted{% endif %}">
+                                <i class="bi bi-{% if project.files.patches %}check-circle-fill{% else %}circle{% endif %}"></i>
+                                Patched
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-footer">
+                    <a href="{{ url_for('main.translate', project_name=project.name) }}" 
+                       class="btn btn-outline-nes w-100">
+                        <i class="bi bi-pencil"></i> Edit Translations
+                    </a>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="card">
+        <div class="card-body text-center py-5">
+            <i class="bi bi-inbox display-1 text-muted"></i>
+            <h4 class="mt-3">No Projects Yet</h4>
+            <p class="text-muted">Upload a ROM and create your first project to get started.</p>
+            <a href="{{ url_for('projects.new_project') }}" class="btn btn-nes">
+                <i class="bi bi-plus-circle"></i> Create Project
+            </a>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

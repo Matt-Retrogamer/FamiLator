@@ -1,0 +1,443 @@
+{% extends "base.html" %}
+
+{% block title %}Translate - {{ project_name }} - FamiLator{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-3">
+    <!-- Header -->
+    <div class="row mb-3">
+        <div class="col">
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb mb-2">
+                    <li class="breadcrumb-item"><a href="{{ url_for('main.index') }}">Home</a></li>
+                    <li class="breadcrumb-item"><a href="{{ url_for('projects.list_projects') }}">Projects</a></li>
+                    <li class="breadcrumb-item active">{{ project_name }}</li>
+                </ol>
+            </nav>
+            <div class="d-flex justify-content-between align-items-center">
+                <h3 class="mb-0">
+                    <i class="bi bi-translate text-danger"></i>
+                    Translation Editor: {{ project_name }}
+                </h3>
+                <div>
+                    <button class="btn btn-outline-info me-2" onclick="autoTranslate()">
+                        <i class="bi bi-robot"></i> Auto-Translate
+                    </button>
+                    <button class="btn btn-outline-success me-2" onclick="checkAllFonts()">
+                        <i class="bi bi-check-circle"></i> Check Fonts
+                    </button>
+                    <button class="btn btn-nes" onclick="buildPatch()">
+                        <i class="bi bi-box-seam"></i> Build Patch
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Stats Bar -->
+    <div class="row mb-3">
+        <div class="col">
+            <div class="card">
+                <div class="card-body py-2">
+                    <div class="row text-center">
+                        <div class="col-md-3">
+                            <small class="text-muted">Total Strings</small>
+                            <div class="h5 mb-0" id="totalStrings">{{ extracted_data|length }}</div>
+                        </div>
+                        <div class="col-md-3">
+                            <small class="text-muted">Translated</small>
+                            <div class="h5 mb-0 text-success" id="translatedCount">{{ translations|length }}</div>
+                        </div>
+                        <div class="col-md-3">
+                            <small class="text-muted">Remaining</small>
+                            <div class="h5 mb-0 text-warning" id="remainingCount">
+                                {{ extracted_data|length - translations|length }}
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <small class="text-muted">Progress</small>
+                            <div class="progress mt-1" style="height: 20px;">
+                                {% set progress = (translations|length / extracted_data|length * 100) if extracted_data else 0 %}
+                                <div class="progress-bar bg-success" style="width: {{ progress|round }}%">
+                                    {{ progress|round }}%
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Translation Table -->
+    <div class="row">
+        <div class="col">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <div>
+                        <i class="bi bi-table"></i> String Table
+                    </div>
+                    <div class="input-group" style="width: 300px;">
+                        <input type="text" class="form-control form-control-sm" 
+                               placeholder="Search..." id="searchInput">
+                        <button class="btn btn-outline-secondary btn-sm" type="button">
+                            <i class="bi bi-search"></i>
+                        </button>
+                    </div>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive" style="max-height: calc(100vh - 350px); overflow-y: auto;">
+                        <table class="table table-dark table-hover mb-0" id="translationTable">
+                            <thead class="sticky-top bg-dark">
+                                <tr>
+                                    <th style="width: 80px;">Offset</th>
+                                    <th style="width: 40%;">Original Text</th>
+                                    <th style="width: 40%;">Translation</th>
+                                    <th style="width: 100px;">Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in extracted_data %}
+                                <tr class="translation-row" data-offset="{{ item.offset }}">
+                                    <td>
+                                        <code class="text-info">{{ item.offset }}</code>
+                                    </td>
+                                    <td>
+                                        <div class="original-text">{{ item.text }}</div>
+                                        <small class="text-muted">
+                                            {{ item.text|length }} chars
+                                        </small>
+                                    </td>
+                                    <td>
+                                        <input type="text" class="form-control form-control-sm translation-input"
+                                               data-offset="{{ item.offset }}"
+                                               data-original-length="{{ item.text|length }}"
+                                               value="{{ translations.get(item.offset|string, '') }}"
+                                               placeholder="Enter translation...">
+                                        <small class="char-count text-muted">0 chars</small>
+                                    </td>
+                                    <td class="text-center">
+                                        <span class="status-badge badge bg-secondary">Pending</span>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Font Check Modal -->
+<div class="modal fade" id="fontCheckModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content bg-dark">
+            <div class="modal-header">
+                <h5 class="modal-title">Font Compatibility Check</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="fontCheckResults">
+                <!-- Results will be inserted here -->
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-warning" onclick="applyAllSuggestions()">
+                    Apply All Suggestions
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    .translation-input {
+        font-family: monospace;
+    }
+    
+    .translation-input.length-ok {
+        border-color: #28a745;
+    }
+    
+    .translation-input.length-warning {
+        border-color: #ffc107;
+    }
+    
+    .translation-input.length-error {
+        border-color: #dc3545;
+    }
+    
+    .original-text {
+        font-family: monospace;
+        white-space: pre-wrap;
+        word-break: break-all;
+    }
+    
+    .char-count.over-limit {
+        color: #dc3545 !important;
+    }
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    const projectName = "{{ project_name }}";
+    let pendingChanges = {};
+    let saveTimeout = null;
+    
+    // Initialize
+    document.addEventListener('DOMContentLoaded', () => {
+        // Update char counts
+        document.querySelectorAll('.translation-input').forEach(input => {
+            updateCharCount(input);
+            
+            // Input event handlers
+            input.addEventListener('input', function() {
+                updateCharCount(this);
+                markModified(this);
+                queueSave(this);
+            });
+            
+            input.addEventListener('blur', function() {
+                saveTranslation(this);
+            });
+        });
+        
+        // Search functionality
+        document.getElementById('searchInput').addEventListener('input', function() {
+            filterTable(this.value);
+        });
+    });
+    
+    function updateCharCount(input) {
+        const row = input.closest('tr');
+        const countEl = row.querySelector('.char-count');
+        const originalLength = parseInt(input.dataset.originalLength);
+        const currentLength = input.value.length;
+        
+        countEl.textContent = `${currentLength} chars`;
+        
+        // Update styling based on length
+        input.classList.remove('length-ok', 'length-warning', 'length-error');
+        countEl.classList.remove('over-limit');
+        
+        if (currentLength === 0) {
+            // No translation yet
+        } else if (currentLength <= originalLength) {
+            input.classList.add('length-ok');
+        } else if (currentLength <= originalLength * 1.2) {
+            input.classList.add('length-warning');
+        } else {
+            input.classList.add('length-error');
+            countEl.classList.add('over-limit');
+        }
+    }
+    
+    function markModified(input) {
+        const row = input.closest('tr');
+        row.classList.add('modified');
+        row.classList.remove('saved');
+        row.querySelector('.status-badge').textContent = 'Modified';
+        row.querySelector('.status-badge').className = 'status-badge badge bg-warning';
+    }
+    
+    function queueSave(input) {
+        pendingChanges[input.dataset.offset] = input.value;
+        
+        // Debounce save
+        if (saveTimeout) clearTimeout(saveTimeout);
+        saveTimeout = setTimeout(() => {
+            Object.keys(pendingChanges).forEach(offset => {
+                const inp = document.querySelector(`input[data-offset="${offset}"]`);
+                if (inp) saveTranslation(inp);
+            });
+            pendingChanges = {};
+        }, 1000);
+    }
+    
+    async function saveTranslation(input) {
+        const offset = input.dataset.offset;
+        const text = input.value;
+        
+        if (!text) return;
+        
+        try {
+            const result = await apiCall('/api/save_translation', 'POST', {
+                project_name: projectName,
+                offset: offset,
+                translated_text: text
+            });
+            
+            if (result.success) {
+                const row = input.closest('tr');
+                row.classList.remove('modified');
+                row.classList.add('saved');
+                row.querySelector('.status-badge').textContent = 'Saved';
+                row.querySelector('.status-badge').className = 'status-badge badge bg-success';
+                
+                updateProgress();
+            }
+        } catch (error) {
+            console.error('Save error:', error);
+        }
+    }
+    
+    function updateProgress() {
+        const total = document.querySelectorAll('.translation-input').length;
+        const translated = document.querySelectorAll('.translation-input:not([value=""])').length;
+        
+        document.getElementById('translatedCount').textContent = translated;
+        document.getElementById('remainingCount').textContent = total - translated;
+        
+        const progress = (translated / total * 100).toFixed(0);
+        const progressBar = document.querySelector('.progress-bar');
+        progressBar.style.width = progress + '%';
+        progressBar.textContent = progress + '%';
+    }
+    
+    function filterTable(query) {
+        const rows = document.querySelectorAll('.translation-row');
+        const lowerQuery = query.toLowerCase();
+        
+        rows.forEach(row => {
+            const text = row.textContent.toLowerCase();
+            row.style.display = text.includes(lowerQuery) ? '' : 'none';
+        });
+    }
+    
+    async function autoTranslate() {
+        if (!confirm('This will auto-translate all untranslated strings. Continue?')) {
+            return;
+        }
+        
+        showLoading('Auto-translating strings...');
+        
+        try {
+            const result = await apiCall('/api/translate', 'POST', {
+                project_name: projectName,
+                use_mock: true
+            });
+            
+            hideLoading();
+            
+            if (result.success) {
+                alert(`Translated ${result.translated_count} strings!`);
+                location.reload();
+            } else {
+                alert('Error: ' + result.error);
+            }
+        } catch (error) {
+            hideLoading();
+            alert('Error: ' + error);
+        }
+    }
+    
+    async function checkAllFonts() {
+        showLoading('Checking font compatibility...');
+        
+        const issues = [];
+        const inputs = document.querySelectorAll('.translation-input');
+        
+        for (const input of inputs) {
+            if (!input.value) continue;
+            
+            try {
+                const result = await apiCall('/api/check_font', 'POST', {
+                    text: input.value
+                });
+                
+                if (!result.compatible) {
+                    issues.push({
+                        offset: input.dataset.offset,
+                        text: input.value,
+                        issues: result.issues,
+                        suggestion: result.suggested_fix
+                    });
+                }
+            } catch (error) {
+                console.error('Font check error:', error);
+            }
+        }
+        
+        hideLoading();
+        showFontCheckResults(issues);
+    }
+    
+    function showFontCheckResults(issues) {
+        const modal = new bootstrap.Modal(document.getElementById('fontCheckModal'));
+        const resultsDiv = document.getElementById('fontCheckResults');
+        
+        if (issues.length === 0) {
+            resultsDiv.innerHTML = `
+                <div class="text-center text-success py-4">
+                    <i class="bi bi-check-circle display-3"></i>
+                    <p class="mt-2">All translations are font-compatible!</p>
+                </div>
+            `;
+        } else {
+            resultsDiv.innerHTML = `
+                <div class="alert alert-warning">
+                    Found ${issues.length} strings with compatibility issues
+                </div>
+                <div class="list-group">
+                    ${issues.map(issue => `
+                        <div class="list-group-item bg-dark text-light">
+                            <div class="d-flex justify-content-between">
+                                <code class="text-info">${issue.offset}</code>
+                                <button class="btn btn-sm btn-outline-warning" 
+                                        onclick="applySuggestion('${issue.offset}', '${issue.suggestion.replace(/'/g, "\\'")}')">
+                                    Apply Fix
+                                </button>
+                            </div>
+                            <div class="mt-2">
+                                <small class="text-muted">Current:</small>
+                                <div class="font-monospace">${issue.text}</div>
+                            </div>
+                            <div class="mt-2">
+                                <small class="text-muted">Suggested:</small>
+                                <div class="font-monospace text-warning">${issue.suggestion}</div>
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+            `;
+        }
+        
+        modal.show();
+    }
+    
+    function applySuggestion(offset, suggestion) {
+        const input = document.querySelector(`input[data-offset="${offset}"]`);
+        if (input) {
+            input.value = suggestion;
+            updateCharCount(input);
+            markModified(input);
+            saveTranslation(input);
+        }
+    }
+    
+    async function buildPatch() {
+        showLoading('Building ROM patch...');
+        
+        try {
+            const result = await apiCall('/api/build_patch', 'POST', {
+                project_name: projectName
+            });
+            
+            hideLoading();
+            
+            if (result.success) {
+                alert(`Patch built successfully!\n\nROM: ${result.rom_path}\nIPS: ${result.ips_path}`);
+            } else {
+                alert('Error: ' + result.error);
+            }
+        } catch (error) {
+            hideLoading();
+            alert('Error: ' + error);
+        }
+    }
+</script>
+{% endblock %}

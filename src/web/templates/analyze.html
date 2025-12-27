@@ -1,0 +1,270 @@
+{% extends "base.html" %}
+
+{% block title %}Analyze ROM - FamiLator{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="row mb-4">
+        <div class="col-12">
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a href="{{ url_for('main.index') }}">Home</a></li>
+                    <li class="breadcrumb-item active">Analyze: {{ filename }}</li>
+                </ol>
+            </nav>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- ROM Info -->
+        <div class="col-md-4 mb-4">
+            <div class="card h-100">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-info-circle"></i> ROM Information</h5>
+                </div>
+                <div class="card-body">
+                    <table class="table table-sm">
+                        <tr>
+                            <td class="text-muted">Filename</td>
+                            <td>{{ filename }}</td>
+                        </tr>
+                        <tr>
+                            <td class="text-muted">CHR Type</td>
+                            <td>
+                                <span class="badge bg-info">{{ chr_analysis.chr_type.value }}</span>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td class="text-muted">Tile Count</td>
+                            <td>{{ chr_analysis.tile_count }}</td>
+                        </tr>
+                        <tr>
+                            <td class="text-muted">Font Regions</td>
+                            <td>{{ chr_analysis.font_regions|length }}</td>
+                        </tr>
+                        <tr>
+                            <td class="text-muted">Latin Font</td>
+                            <td>
+                                {% if chr_analysis.has_latin_font %}
+                                    <span class="badge bg-success">Yes</span>
+                                {% else %}
+                                    <span class="badge bg-warning">No</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        <tr>
+                            <td class="text-muted">Extended Charset</td>
+                            <td>
+                                {% if chr_analysis.has_extended_charset %}
+                                    <span class="badge bg-success">Yes</span>
+                                {% else %}
+                                    <span class="badge bg-secondary">No</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Language Detection -->
+        <div class="col-md-4 mb-4">
+            <div class="card h-100">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-translate"></i> Language Detection</h5>
+                </div>
+                <div class="card-body">
+                    <div class="text-center mb-3">
+                        <div class="display-4 mb-2">
+                            {% if lang_analysis.primary_language.value == 'japanese' %}
+                                🇯🇵
+                            {% elif lang_analysis.primary_language.value == 'english' %}
+                                🇺🇸
+                            {% else %}
+                                🌐
+                            {% endif %}
+                        </div>
+                        <h4>{{ lang_analysis.primary_language.value|title }}</h4>
+                        <div class="progress mt-3" style="height: 25px;">
+                            <div class="progress-bar bg-danger" role="progressbar" 
+                                 style="width: {{ (lang_analysis.confidence * 100)|round }}%">
+                                {{ (lang_analysis.confidence * 100)|round }}% Confidence
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <hr>
+                    
+                    <h6 class="text-muted">Character Breakdown</h6>
+                    <div class="row small">
+                        <div class="col-6">
+                            <div>Hiragana: {{ lang_analysis.hiragana_count }}</div>
+                            <div>Katakana: {{ lang_analysis.katakana_count }}</div>
+                        </div>
+                        <div class="col-6">
+                            <div>Kanji: {{ lang_analysis.kanji_count }}</div>
+                            <div>ASCII: {{ lang_analysis.ascii_count }}</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Actions -->
+        <div class="col-md-4 mb-4">
+            <div class="card h-100">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-lightning"></i> Quick Actions</h5>
+                </div>
+                <div class="card-body">
+                    <div class="d-grid gap-3">
+                        <button class="btn btn-nes btn-lg" onclick="createProject()">
+                            <i class="bi bi-plus-circle"></i> Create Project
+                        </button>
+                        
+                        <a href="{{ url_for('main.tile_browser', project_name=filename.rsplit('.', 1)[0]) }}" 
+                           class="btn btn-outline-info btn-lg">
+                            <i class="bi bi-grid-3x3"></i> Browse Tiles
+                        </a>
+                        
+                        <button class="btn btn-outline-secondary btn-lg" onclick="downloadAnalysis()">
+                            <i class="bi bi-download"></i> Download Report
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Font Regions -->
+    {% if chr_analysis.font_regions %}
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-fonts"></i> Detected Font Regions</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-dark">
+                            <thead>
+                                <tr>
+                                    <th>#</th>
+                                    <th>Start Tile</th>
+                                    <th>End Tile</th>
+                                    <th>Tile Count</th>
+                                    <th>Type</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for region in chr_analysis.font_regions %}
+                                <tr>
+                                    <td>{{ loop.index }}</td>
+                                    <td>0x{{ '%04X'|format(region.start_tile) }}</td>
+                                    <td>0x{{ '%04X'|format(region.end_tile) }}</td>
+                                    <td>{{ region.end_tile - region.start_tile }}</td>
+                                    <td>
+                                        {% if region.is_latin_font %}
+                                            <span class="badge bg-success">Latin</span>
+                                        {% else %}
+                                            <span class="badge bg-info">Japanese</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Create Project Modal -->
+<div class="modal fade" id="createProjectModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content bg-dark">
+            <div class="modal-header">
+                <h5 class="modal-title">Create New Project</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label">Project Name</label>
+                    <input type="text" class="form-control" id="projectName" 
+                           value="{{ filename.rsplit('.', 1)[0]|replace(' ', '_')|replace('-', '_') }}">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Character Table</label>
+                    <select class="form-select" id="tableFile">
+                        <option value="tables/common.tbl">Common (default)</option>
+                        <option value="tables/tennis.tbl">Tennis</option>
+                        <option value="tables/zelda.tbl">Zelda</option>
+                    </select>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-nes" onclick="submitCreateProject()">
+                    Create & Extract
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    const filename = "{{ filename }}";
+    
+    function createProject() {
+        new bootstrap.Modal(document.getElementById('createProjectModal')).show();
+    }
+    
+    async function submitCreateProject() {
+        const projectName = document.getElementById('projectName').value;
+        const tableFile = document.getElementById('tableFile').value;
+        
+        showLoading('Extracting text from ROM...');
+        
+        try {
+            const result = await apiCall('/api/extract', 'POST', {
+                rom_filename: filename,
+                output_name: projectName,
+                table_file: tableFile
+            });
+            
+            hideLoading();
+            
+            if (result.success) {
+                window.location.href = `/projects/${result.project_name}`;
+            } else {
+                alert('Error: ' + result.error);
+            }
+        } catch (error) {
+            hideLoading();
+            alert('Error creating project: ' + error);
+        }
+    }
+    
+    function downloadAnalysis() {
+        // Generate and download analysis report
+        const report = {
+            filename: filename,
+            chr_analysis: {{ chr_analysis|tojson }},
+            lang_analysis: {{ lang_analysis|tojson }}
+        };
+        
+        const blob = new Blob([JSON.stringify(report, null, 2)], {type: 'application/json'});
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename.replace('.nes', '_analysis.json');
+        a.click();
+        URL.revokeObjectURL(url);
+    }
+</script>
+{% endblock %}

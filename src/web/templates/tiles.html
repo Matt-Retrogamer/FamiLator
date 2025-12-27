@@ -1,0 +1,414 @@
+{% extends "base.html" %}
+
+{% block title %}Tile Browser - {{ project_name }} - FamiLator{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="row mb-4">
+        <div class="col-12">
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a href="{{ url_for('main.index') }}">Home</a></li>
+                    <li class="breadcrumb-item"><a href="{{ url_for('projects.list_projects') }}">Projects</a></li>
+                    <li class="breadcrumb-item active">Tile Browser: {{ project_name }}</li>
+                </ol>
+            </nav>
+            <h3>
+                <i class="bi bi-grid-3x3 text-info"></i>
+                CHR Tile Browser: {{ project_name }}
+            </h3>
+        </div>
+    </div>
+
+    {% if chr_analysis %}
+    <div class="row">
+        <!-- Tile Info Sidebar -->
+        <div class="col-md-3">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-info-circle"></i> CHR Info</h5>
+                </div>
+                <div class="card-body">
+                    <table class="table table-sm">
+                        <tr>
+                            <td class="text-muted">Type</td>
+                            <td>{{ chr_analysis.chr_type.value }}</td>
+                        </tr>
+                        <tr>
+                            <td class="text-muted">Total Tiles</td>
+                            <td>{{ chr_analysis.tile_count }}</td>
+                        </tr>
+                        <tr>
+                            <td class="text-muted">Latin Font</td>
+                            <td>
+                                {% if chr_analysis.has_latin_font %}
+                                    <span class="text-success">✓ Yes</span>
+                                {% else %}
+                                    <span class="text-warning">✗ No</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        <tr>
+                            <td class="text-muted">Extended</td>
+                            <td>
+                                {% if chr_analysis.has_extended_charset %}
+                                    <span class="text-success">✓ Yes</span>
+                                {% else %}
+                                    <span class="text-muted">✗ No</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Font Regions -->
+            {% if chr_analysis.font_regions %}
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-fonts"></i> Font Regions</h5>
+                </div>
+                <div class="list-group list-group-flush">
+                    {% for region in chr_analysis.font_regions %}
+                    <button class="list-group-item list-group-item-action bg-dark text-light"
+                            onclick="scrollToTile({{ region.start_tile }})">
+                        <div class="d-flex justify-content-between">
+                            <span>Region {{ loop.index }}</span>
+                            <span class="badge {% if region.is_latin_font %}bg-success{% else %}bg-info{% endif %}">
+                                {% if region.is_latin_font %}Latin{% else %}JP{% endif %}
+                            </span>
+                        </div>
+                        <small class="text-muted">
+                            Tiles {{ region.start_tile }} - {{ region.end_tile }}
+                        </small>
+                    </button>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Display Options -->
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-gear"></i> Display</h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label class="form-label">Zoom</label>
+                        <input type="range" class="form-range" min="1" max="4" value="2" 
+                               id="zoomSlider" onchange="updateZoom(this.value)">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Palette</label>
+                        <select class="form-select form-select-sm" id="paletteSelect" 
+                                onchange="updatePalette(this.value)">
+                            <option value="mono">Monochrome</option>
+                            <option value="nes1">NES Default</option>
+                            <option value="gameboy">Game Boy</option>
+                            <option value="sepia">Sepia</option>
+                        </select>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="showGrid" checked
+                               onchange="toggleGrid(this.checked)">
+                        <label class="form-check-label">Show Grid</label>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tile Grid -->
+        <div class="col-md-9">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <span><i class="bi bi-grid"></i> Tile Grid</span>
+                    <div class="input-group" style="width: 200px;">
+                        <input type="number" class="form-control form-control-sm" 
+                               placeholder="Go to tile..." id="gotoTile" min="0" 
+                               max="{{ chr_analysis.tile_count - 1 }}">
+                        <button class="btn btn-outline-secondary btn-sm" onclick="goToTile()">
+                            Go
+                        </button>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="tile-container" id="tileContainer">
+                        <div class="tile-grid" id="tileGrid">
+                            <!-- Tiles rendered here by JavaScript -->
+                            <div class="text-center py-5">
+                                <div class="spinner-border text-danger" role="status"></div>
+                                <p class="mt-2">Loading tiles...</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Selected Tile Info -->
+            <div class="card mt-4" id="selectedTileCard" style="display: none;">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-cursor-fill"></i> Selected Tile</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-3 text-center">
+                            <canvas id="selectedTileCanvas" width="64" height="64" 
+                                    style="image-rendering: pixelated; border: 2px solid #0f3460;"></canvas>
+                        </div>
+                        <div class="col-md-9">
+                            <table class="table table-sm">
+                                <tr>
+                                    <td class="text-muted">Tile Index</td>
+                                    <td id="selectedTileIndex">-</td>
+                                </tr>
+                                <tr>
+                                    <td class="text-muted">Hex Value</td>
+                                    <td id="selectedTileHex">-</td>
+                                </tr>
+                                <tr>
+                                    <td class="text-muted">CHR Offset</td>
+                                    <td id="selectedTileOffset">-</td>
+                                </tr>
+                                <tr>
+                                    <td class="text-muted">In Font Region</td>
+                                    <td id="selectedTileRegion">-</td>
+                                </tr>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% else %}
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-body text-center py-5">
+                    <i class="bi bi-exclamation-triangle display-3 text-warning"></i>
+                    <h4 class="mt-3">No ROM Associated</h4>
+                    <p class="text-muted">
+                        Could not find the original ROM for this project.
+                        Upload the ROM to view CHR tiles.
+                    </p>
+                    <a href="{{ url_for('main.upload') }}" class="btn btn-nes">
+                        <i class="bi bi-upload"></i> Upload ROM
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    .tile-container {
+        max-height: 600px;
+        overflow-y: auto;
+        background-color: #0a0a15;
+        border-radius: 4px;
+        padding: 10px;
+    }
+    
+    .tile-grid {
+        display: grid;
+        grid-template-columns: repeat(16, 1fr);
+        gap: 2px;
+    }
+    
+    .tile-grid.no-grid {
+        gap: 0;
+    }
+    
+    .tile-cell {
+        aspect-ratio: 1;
+        background-color: #1a1a2e;
+        cursor: pointer;
+        position: relative;
+        transition: transform 0.1s;
+    }
+    
+    .tile-cell:hover {
+        transform: scale(1.2);
+        z-index: 10;
+        box-shadow: 0 0 10px rgba(230, 0, 18, 0.5);
+    }
+    
+    .tile-cell.selected {
+        box-shadow: 0 0 0 2px var(--nes-red);
+    }
+    
+    .tile-cell canvas {
+        width: 100%;
+        height: 100%;
+        image-rendering: pixelated;
+    }
+    
+    .tile-cell .tile-index {
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        font-size: 8px;
+        background: rgba(0,0,0,0.7);
+        text-align: center;
+        display: none;
+    }
+    
+    .tile-cell:hover .tile-index {
+        display: block;
+    }
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    {% if chr_analysis %}
+    const tileCount = {{ chr_analysis.tile_count }};
+    const fontRegions = {{ chr_analysis.font_regions | tojson }};
+    {% else %}
+    const tileCount = 0;
+    const fontRegions = [];
+    {% endif %}
+    
+    let currentZoom = 2;
+    let showGrid = true;
+    let selectedTile = null;
+    
+    // Palettes
+    const palettes = {
+        mono: ['#000000', '#555555', '#AAAAAA', '#FFFFFF'],
+        nes1: ['#000000', '#0000AA', '#00AA00', '#FFFFFF'],
+        gameboy: ['#0f380f', '#306230', '#8bac0f', '#9bbc0f'],
+        sepia: ['#2b1d0e', '#5e4a2b', '#a39171', '#d9c9a3']
+    };
+    let currentPalette = 'mono';
+    
+    document.addEventListener('DOMContentLoaded', () => {
+        if (tileCount > 0) {
+            renderTileGrid();
+        }
+    });
+    
+    function renderTileGrid() {
+        const grid = document.getElementById('tileGrid');
+        grid.innerHTML = '';
+        
+        // For demo, create placeholder tiles
+        // In production, this would fetch actual tile data from the API
+        for (let i = 0; i < Math.min(tileCount, 512); i++) {
+            const cell = document.createElement('div');
+            cell.className = 'tile-cell';
+            cell.dataset.index = i;
+            cell.onclick = () => selectTile(i);
+            
+            const canvas = document.createElement('canvas');
+            canvas.width = 8;
+            canvas.height = 8;
+            
+            // Draw placeholder pattern
+            const ctx = canvas.getContext('2d');
+            const colors = palettes[currentPalette];
+            
+            for (let y = 0; y < 8; y++) {
+                for (let x = 0; x < 8; x++) {
+                    // Simple pattern based on tile index
+                    const colorIndex = ((x + y + i) % 4);
+                    ctx.fillStyle = colors[colorIndex];
+                    ctx.fillRect(x, y, 1, 1);
+                }
+            }
+            
+            cell.appendChild(canvas);
+            
+            const indexLabel = document.createElement('div');
+            indexLabel.className = 'tile-index';
+            indexLabel.textContent = i.toString(16).toUpperCase();
+            cell.appendChild(indexLabel);
+            
+            grid.appendChild(cell);
+        }
+        
+        updateZoom(currentZoom);
+        if (!showGrid) toggleGrid(false);
+    }
+    
+    function selectTile(index) {
+        // Remove previous selection
+        document.querySelectorAll('.tile-cell.selected').forEach(el => {
+            el.classList.remove('selected');
+        });
+        
+        // Select new tile
+        const cell = document.querySelector(`.tile-cell[data-index="${index}"]`);
+        if (cell) {
+            cell.classList.add('selected');
+            selectedTile = index;
+            
+            // Update info panel
+            document.getElementById('selectedTileCard').style.display = 'block';
+            document.getElementById('selectedTileIndex').textContent = index;
+            document.getElementById('selectedTileHex').textContent = '0x' + index.toString(16).toUpperCase().padStart(2, '0');
+            document.getElementById('selectedTileOffset').textContent = '0x' + (index * 16).toString(16).toUpperCase();
+            
+            // Check if in font region
+            let region = 'None';
+            for (let i = 0; i < fontRegions.length; i++) {
+                if (index >= fontRegions[i].start_tile && index <= fontRegions[i].end_tile) {
+                    region = `Region ${i + 1} (${fontRegions[i].is_latin_font ? 'Latin' : 'Japanese'})`;
+                    break;
+                }
+            }
+            document.getElementById('selectedTileRegion').textContent = region;
+            
+            // Draw enlarged tile
+            const canvas = document.getElementById('selectedTileCanvas');
+            const ctx = canvas.getContext('2d');
+            const sourceCanvas = cell.querySelector('canvas');
+            ctx.imageSmoothingEnabled = false;
+            ctx.drawImage(sourceCanvas, 0, 0, 64, 64);
+        }
+    }
+    
+    function updateZoom(value) {
+        currentZoom = parseInt(value);
+        const size = 16 * currentZoom;
+        document.querySelectorAll('.tile-cell').forEach(cell => {
+            cell.style.width = size + 'px';
+            cell.style.height = size + 'px';
+        });
+        
+        const grid = document.getElementById('tileGrid');
+        grid.style.gridTemplateColumns = `repeat(16, ${size}px)`;
+    }
+    
+    function updatePalette(palette) {
+        currentPalette = palette;
+        renderTileGrid();
+        if (selectedTile !== null) selectTile(selectedTile);
+    }
+    
+    function toggleGrid(show) {
+        showGrid = show;
+        const grid = document.getElementById('tileGrid');
+        grid.classList.toggle('no-grid', !show);
+    }
+    
+    function scrollToTile(index) {
+        const cell = document.querySelector(`.tile-cell[data-index="${index}"]`);
+        if (cell) {
+            cell.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            selectTile(index);
+        }
+    }
+    
+    function goToTile() {
+        const index = parseInt(document.getElementById('gotoTile').value);
+        if (!isNaN(index) && index >= 0 && index < tileCount) {
+            scrollToTile(index);
+        }
+    }
+</script>
+{% endblock %}
