@@ -29,6 +29,8 @@ keywords = ["nes", "famicom", "rom", "translation", "retro", "gaming", "ai", "ll
 dependencies = [
     "PyYAML>=6.0.1",
     "requests>=2.31.0",
+    "Flask>=3.0.0",
+    "Werkzeug>=3.0.0",
 ]
 
 [project.optional-dependencies]
