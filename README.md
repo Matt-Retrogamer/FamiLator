@@ -19,6 +19,8 @@ The project supports both simple games (_Tennis_) and complex titles with pointe
 - ⚡ **One-command workflow** — Select ROM, specify languages, get translated patch automatically
 - 📂 **Project management** — Save/resume projects, track progress, edit and re-apply translations
 - 🌐 **Language detection** — Automatic Japanese/English detection from extracted text
+- 🎨 **CHR ROM analysis** — Detect available tiles, font regions, and character sets
+- 🔤 **Font compatibility** — Validate and auto-fix translations for available glyphs
 - 🧠 **Intelligent text detection** using pattern recognition and configurable encoding tables
 - 📤 **Multi-format export** to structured formats (CSV/JSON) with metadata preservation
 - 🤖 **LLM-powered translation** with retry logic, batch processing, and constraint validation
@@ -53,9 +55,11 @@ FamiLator/
 │   ├── cli.py               # Unified command-line interface
 │   ├── pipeline.py          # Translation pipeline orchestration
 │   ├── project.py           # Project state management
+│   ├── chr_analyzer.py      # CHR ROM tile/font analysis
 │   ├── detector.py          # Text detection algorithms (entropy, frequency, terminators)
 │   ├── encoding.py          # Character encoding/decoding with .tbl support
 │   ├── extractor.py         # ROM text extraction with metadata preservation
+│   ├── font_checker.py      # Font compatibility validation & auto-fix
 │   ├── language_detector.py # Automatic Japanese/English language detection
 │   ├── pointer_utils.py     # Pointer table manipulation utilities
 │   ├── reinjector.py        # Text reinsertion with pointer updates
@@ -549,11 +553,17 @@ FamiLator provides rich context to improve translation quality and consistency.
 - ✅ **Confidence scoring** — track translation quality metrics
 - ✅ **Progress tracking** — detailed timing and success/failure counts
 
-### 🔄 Phase 7: Font & Character Analysis (Planned)
-- 📋 **CHR ROM analysis** for available character detection
-- 📋 **Font compatibility checking** before translation
-- 📋 **Character substitution suggestions** for missing glyphs
-- 📋 **Web interface** for non-technical users
+### ✅ Phase 7: Font & Character Analysis (COMPLETED)
+- ✅ **CHR ROM analysis** — detect tile count, font regions, and CHR type (ROM/RAM)
+- ✅ **Font compatibility checking** — validate translations against available characters
+- ✅ **Auto-substitution** — replace incompatible characters (accents, symbols, punctuation)
+- ✅ **Character mapping report** — identify missing glyphs with suggestions
+
+### 🔄 Phase 8: Web Interface (Planned)
+- 📋 **Web-based UI** for non-technical users
+- 📋 **Visual tile/font browser**
+- 📋 **Interactive translation editor**
+- 📋 **Project sharing and collaboration**
 
 ## 🚀 Quick Start Summary
 

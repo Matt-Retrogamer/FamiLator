@@ -17,6 +17,8 @@ try:
     from .reinjector import TextReinjector
     from .translator import GameTranslator, TranslationConfig, Glossary, TranslationMemory
     from .language_detector import LanguageDetector, Language
+    from .font_checker import FontChecker, FontCheckResult
+    from .chr_analyzer import CHRAnalyzer, CHRAnalysis
     from .validator import ROMValidator
 except ImportError:
     from project import ProjectStatus, TranslationProject, TranslationEntry
@@ -24,6 +26,8 @@ except ImportError:
     from reinjector import TextReinjector
     from translator import GameTranslator, TranslationConfig, Glossary, TranslationMemory
     from language_detector import LanguageDetector, Language
+    from font_checker import FontChecker, FontCheckResult
+    from chr_analyzer import CHRAnalyzer, CHRAnalysis
     from validator import ROMValidator
 
 
@@ -60,7 +64,23 @@ class TranslationPipeline:
         self.extractor: Optional[TextExtractor] = None
         self.reinjector: Optional[TextReinjector] = None
         self.translator: Optional[GameTranslator] = None
+        self.chr_analysis: Optional[CHRAnalysis] = None
     
+    def _analyze_chr_rom(self) -> Optional[CHRAnalysis]:
+        """
+        Analyze the ROM's CHR data to detect available fonts/tiles.
+        
+        Returns:
+            CHRAnalysis or None if analysis failed
+        """
+        try:
+            analyzer = CHRAnalyzer()
+            self.chr_analysis = analyzer.analyze_rom(str(self.project.rom_path))
+            return self.chr_analysis
+        except Exception as e:
+            self.project.add_error(f"CHR analysis warning: {e}")
+            return None
+
     def run_full_pipeline(self, skip_validation: bool = False) -> PipelineResult:
         """
         Run the complete translation pipeline.
@@ -140,6 +160,12 @@ class TranslationPipeline:
                         self.project.config.source_language = "Japanese"
                     elif lang_analysis.detected_language == Language.ENGLISH:
                         self.project.config.source_language = "English"
+            
+            # Analyze CHR ROM for font information
+            chr_analysis = self._analyze_chr_rom()
+            if chr_analysis and chr_analysis.font_regions:
+                print(f"   🎨 Found {len(chr_analysis.font_regions)} font regions "
+                      f"({chr_analysis.unique_tiles} unique tiles)")
             
             # Convert to translation entries
             self.project.translations = []
@@ -277,6 +303,11 @@ class TranslationPipeline:
             if batch_result.failure_count > 0:
                 print(f"   ⚠️  {batch_result.failure_count} strings failed")
             
+            # Check font compatibility and auto-fix if needed
+            font_issues = self._check_font_compatibility()
+            if font_issues > 0:
+                print(f"   🔤 Fixed {font_issues} character compatibility issues")
+            
             # Save glossary and memory for future use
             glossary.save(str(glossary_path))
             memory.save(str(memory_path))
@@ -329,6 +360,50 @@ class TranslationPipeline:
         
         print(f"   ✓ Saved translations to {paths['translated_csv'].name}")
     
+    def _check_font_compatibility(self) -> int:
+        """
+        Check translated text for font compatibility and auto-fix issues.
+        
+        Returns:
+            Number of strings that were modified
+        """
+        # Try to load encoding table for font checking
+        table_path = None
+        config_path = self.project.find_or_create_config()
+        
+        if config_path:
+            import yaml
+            try:
+                with open(config_path) as f:
+                    config = yaml.safe_load(f)
+                    if config and "table_file" in config:
+                        table_path = config["table_file"]
+            except Exception:
+                pass
+        
+        # Initialize font checker
+        font_checker = FontChecker(table_path=table_path)
+        
+        # Check and fix each translation
+        fixed_count = 0
+        for entry in self.project.translations:
+            if entry.translated_text:
+                result = font_checker.check_text(entry.translated_text, auto_fix=True)
+                
+                if not result.is_compatible and result.suggested_text:
+                    # Apply the auto-fixed version
+                    entry.translated_text = result.suggested_text
+                    
+                    # Add note about substitutions
+                    if entry.notes:
+                        entry.notes += "; Font compatibility fix applied"
+                    else:
+                        entry.notes = "Font compatibility fix applied"
+                    
+                    fixed_count += 1
+        
+        return fixed_count
+
     def run_reinjection(
         self,
         csv_path: Optional[str] = None,
