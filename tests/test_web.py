@@ -7,11 +7,11 @@ import tempfile
 from pathlib import Path
 from unittest.mock import patch, MagicMock
 
-# Add src to path
+# Add project root to path
 import sys
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from src.web.app import create_app
+from web.app import create_app
 
 
 @pytest.fixture
@@ -24,6 +24,9 @@ def app():
             "UPLOAD_FOLDER": os.path.join(tmpdir, "roms"),
             "OUTPUT_FOLDER": os.path.join(tmpdir, "output"),
         }
+        # Create the directories since we're using absolute paths in tests
+        os.makedirs(config["UPLOAD_FOLDER"], exist_ok=True)
+        os.makedirs(config["OUTPUT_FOLDER"], exist_ok=True)
         app = create_app(config)
         yield app
 
@@ -190,26 +193,26 @@ class TestFileHelpers:
     def test_allowed_file_nes(self, app):
         """Test .nes files are allowed."""
         with app.app_context():
-            from src.web.routes import allowed_file
+            from web.routes import allowed_file
             assert allowed_file("game.nes") is True
     
     def test_allowed_file_fds(self, app):
         """Test .fds files are allowed."""
         with app.app_context():
-            from src.web.routes import allowed_file
+            from web.routes import allowed_file
             assert allowed_file("game.fds") is True
     
     def test_allowed_file_invalid(self, app):
         """Test invalid extensions are rejected."""
         with app.app_context():
-            from src.web.routes import allowed_file
+            from web.routes import allowed_file
             assert allowed_file("game.exe") is False
             assert allowed_file("game.txt") is False
     
     def test_allowed_file_no_extension(self, app):
         """Test files without extensions are rejected."""
         with app.app_context():
-            from src.web.routes import allowed_file
+            from web.routes import allowed_file
             assert allowed_file("gamefile") is False
 
 

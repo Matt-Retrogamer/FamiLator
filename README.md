@@ -66,6 +66,12 @@ FamiLator/
 │   ├── translator.py        # Enhanced LLM translation with glossary & memory
 │   ├── translator_stub.py   # OLLAMA LLM integration and mock translation (legacy)
 │   └── validator.py         # ROM integrity and translation validation
+├── web/                      # Web interface package
+│   ├── __init__.py          # Package initialization
+│   ├── app.py               # Flask application factory
+│   ├── routes.py            # Web routes and API endpoints
+│   ├── static/              # Static assets (CSS, JS)
+│   └── templates/           # HTML templates
 ├── tests/                    # Comprehensive test suite (144 tests)
 │   ├── test_encoding.py          # Encoding/decoding tests
 │   ├── test_extractor.py         # Text extraction tests
