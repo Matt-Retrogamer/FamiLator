@@ -15,13 +15,15 @@ try:
     from .project import ProjectStatus, TranslationProject, TranslationEntry
     from .extractor import TextExtractor
     from .reinjector import TextReinjector
-    from .translator_stub import TranslatorStub, TranslationRequest
+    from .translator import GameTranslator, TranslationConfig, Glossary, TranslationMemory
+    from .language_detector import LanguageDetector, Language
     from .validator import ROMValidator
 except ImportError:
     from project import ProjectStatus, TranslationProject, TranslationEntry
     from extractor import TextExtractor
     from reinjector import TextReinjector
-    from translator_stub import TranslatorStub, TranslationRequest
+    from translator import GameTranslator, TranslationConfig, Glossary, TranslationMemory
+    from language_detector import LanguageDetector, Language
     from validator import ROMValidator
 
 
@@ -57,7 +59,7 @@ class TranslationPipeline:
         self.project = project
         self.extractor: Optional[TextExtractor] = None
         self.reinjector: Optional[TextReinjector] = None
-        self.translator: Optional[TranslatorStub] = None
+        self.translator: Optional[GameTranslator] = None
     
     def run_full_pipeline(self, skip_validation: bool = False) -> PipelineResult:
         """
@@ -123,6 +125,22 @@ class TranslationPipeline:
             
             print(f"   ✓ Extracted {len(extracted)} strings")
             
+            # Detect source language
+            if extracted:
+                detector = LanguageDetector()
+                texts = [s.decoded_text for s in extracted if s.decoded_text.strip()]
+                lang_analysis = detector.detect_from_strings(texts)
+                
+                detected_lang = lang_analysis.detected_language.value.capitalize()
+                print(f"   🌐 Detected language: {detected_lang} (confidence: {lang_analysis.confidence:.0%})")
+                
+                # Update project if we detected a different language
+                if lang_analysis.confidence > 0.7:
+                    if lang_analysis.detected_language == Language.JAPANESE:
+                        self.project.config.source_language = "Japanese"
+                    elif lang_analysis.detected_language == Language.ENGLISH:
+                        self.project.config.source_language = "English"
+            
             # Convert to translation entries
             self.project.translations = []
             for i, string in enumerate(extracted):
@@ -172,7 +190,7 @@ class TranslationPipeline:
     
     def run_translation(self) -> PipelineResult:
         """
-        Run the translation stage.
+        Run the translation stage using the enhanced translator.
         
         Returns:
             Pipeline result
@@ -181,70 +199,87 @@ class TranslationPipeline:
         self.project.update_status(ProjectStatus.TRANSLATING)
         
         try:
-            # Build translator config
-            translator_config = {
-                "mock_mode": self.project.config.mock_translation,
-                "target_language": self.project.config.target_language,
-                "source_language": self.project.config.source_language,
-                "game_context": f"Video game: {self.project.config.game_name}",
-                "model": self.project.config.llm_model,
-                "base_url": self.project.config.llm_base_url,
-                "temperature": 0.3,
-            }
+            # Initialize glossary and translation memory
+            paths = self.project.get_output_paths()
+            glossary_path = self.project.output_dir / "glossary.json"
+            memory_path = self.project.output_dir / "translation_memory.json"
             
-            self.translator = TranslatorStub(translator_config)
+            glossary = Glossary(str(glossary_path) if glossary_path.exists() else None)
+            memory = TranslationMemory(str(memory_path) if memory_path.exists() else None)
+            
+            # Build translator config
+            config = TranslationConfig(
+                source_language=self.project.config.source_language,
+                target_language=self.project.config.target_language,
+                llm_provider="ollama",
+                llm_model=self.project.config.llm_model,
+                llm_base_url=self.project.config.llm_base_url,
+                temperature=0.3,
+                max_retries=3,
+                retry_delay=1.0,
+                timeout=60,
+                batch_size=5,
+                game_context=self.project.config.game_name,
+                mock_mode=self.project.config.mock_translation,
+            )
+            
+            # Initialize enhanced translator
+            translator = GameTranslator(config, glossary, memory)
             
             # Test connection if not mock mode
-            if not self.project.config.mock_translation:
-                if not self.translator.test_connection():
+            if not config.mock_mode:
+                if not translator.test_connection():
                     print("   ⚠️  LLM service not available, using mock mode")
-                    translator_config["mock_mode"] = True
-                    self.translator = TranslatorStub(translator_config)
+                    config.mock_mode = True
+                    translator = GameTranslator(config, glossary, memory)
             
-            # Translate each entry
-            total = len(self.project.translations)
-            translated_count = 0
-            failed_count = 0
+            # Prepare texts for batch translation
+            texts = []
+            contexts = []
+            valid_indices = []
             
             for i, entry in enumerate(self.project.translations):
-                # Skip empty strings
-                if not entry.original_text.strip():
+                if entry.original_text.strip():
+                    texts.append(entry.original_text)
+                    contexts.append(f"Game dialogue, max {entry.max_bytes} bytes")
+                    valid_indices.append(i)
+                else:
                     entry.status = "skipped"
-                    continue
-                
-                # Progress indicator
-                if (i + 1) % 10 == 0 or i == 0:
-                    print(f"   Translating {i+1}/{total}...", end="\r")
-                
-                try:
-                    request = TranslationRequest(
-                        text=entry.original_text,
-                        context=f"Game dialogue, max {entry.max_bytes} bytes",
-                        max_length=entry.max_bytes * 2,  # Allow expansion
-                        target_language=self.project.config.target_language,
-                        source_language=self.project.config.source_language,
-                    )
-                    
-                    response = self.translator.translate_string(request)
-                    
-                    entry.translated_text = response.translated_text
-                    entry.confidence = response.confidence
-                    entry.status = "translated"
-                    
-                    if response.warnings:
-                        entry.notes = "; ".join(response.warnings)
-                    
-                    translated_count += 1
-                    
-                except Exception as e:
-                    entry.status = "pending"
-                    entry.notes = f"Translation error: {e}"
-                    failed_count += 1
             
-            print(f"   ✓ Translated {translated_count}/{total} strings" + " " * 20)
+            total = len(texts)
+            print(f"   📝 Processing {total} strings...")
             
-            if failed_count > 0:
-                print(f"   ⚠️  {failed_count} strings failed")
+            # Translate in batches
+            batch_result = translator.translate_batch(texts, contexts)
+            
+            # Apply results
+            for idx, result in zip(valid_indices, batch_result.results):
+                entry = self.project.translations[idx]
+                entry.translated_text = result.translated
+                entry.confidence = result.confidence
+                entry.status = "translated" if result.confidence > 0.3 else "pending"
+                
+                notes = []
+                if result.from_glossary:
+                    notes.append("From glossary")
+                if result.from_memory:
+                    notes.append("From memory")
+                if result.retries > 0:
+                    notes.append(f"Retried {result.retries}x")
+                if result.warnings:
+                    notes.extend(result.warnings)
+                
+                entry.notes = "; ".join(notes) if notes else ""
+            
+            print(f"   ✓ Translated {batch_result.success_count}/{total} strings")
+            print(f"   ⏱️  Time: {batch_result.total_time:.1f}s")
+            
+            if batch_result.failure_count > 0:
+                print(f"   ⚠️  {batch_result.failure_count} strings failed")
+            
+            # Save glossary and memory for future use
+            glossary.save(str(glossary_path))
+            memory.save(str(memory_path))
             
             # Export translated CSV
             self._export_translations_csv()

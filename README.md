@@ -18,9 +18,11 @@ The project supports both simple games (_Tennis_) and complex titles with pointe
 ## 🎯 Features
 - ⚡ **One-command workflow** — Select ROM, specify languages, get translated patch automatically
 - 📂 **Project management** — Save/resume projects, track progress, edit and re-apply translations
+- 🌐 **Language detection** — Automatic Japanese/English detection from extracted text
 - 🧠 **Intelligent text detection** using pattern recognition and configurable encoding tables
 - 📤 **Multi-format export** to structured formats (CSV/JSON) with metadata preservation
-- 🤖 **LLM-powered translation** with constraint validation (OLLAMA-ready)
+- 🤖 **LLM-powered translation** with retry logic, batch processing, and constraint validation
+- 📚 **Glossary & translation memory** — Per-project terminology management and caching
 - 📥 **Smart reinsertion** with automatic pointer updates and space optimization
 - 🧪 **Comprehensive testing** including round-trip consistency and ROM integrity validation
 - 🎛️ **Control code handling** for formatting, colors, and special characters
@@ -54,9 +56,11 @@ FamiLator/
 │   ├── detector.py          # Text detection algorithms (entropy, frequency, terminators)
 │   ├── encoding.py          # Character encoding/decoding with .tbl support
 │   ├── extractor.py         # ROM text extraction with metadata preservation
+│   ├── language_detector.py # Automatic Japanese/English language detection
 │   ├── pointer_utils.py     # Pointer table manipulation utilities
 │   ├── reinjector.py        # Text reinsertion with pointer updates
-│   ├── translator_stub.py   # OLLAMA LLM integration and mock translation
+│   ├── translator.py        # Enhanced LLM translation with glossary & memory
+│   ├── translator_stub.py   # OLLAMA LLM integration and mock translation (legacy)
 │   └── validator.py         # ROM integrity and translation validation
 ├── tests/                    # Comprehensive test suite (15 tests)
 │   ├── test_encoding.py     # Encoding/decoding tests
@@ -203,11 +207,13 @@ FamiLator now supports persistent project management, allowing you to pause and 
 Each translation creates a project folder with:
 ```
 output/game_name_en/
-├── project_state.json      # Project status and metadata
-├── project_config.yaml     # Editable configuration
-├── translations.json       # All strings with progress tracking
-├── game_config.yaml        # Auto-generated game settings
-├── game_name_extracted.csv # Extracted text
+├── project_state.json       # Project status and metadata
+├── project_config.yaml      # Editable configuration
+├── translations.json        # All strings with progress tracking
+├── glossary.json            # Per-project terminology (auto-updated)
+├── translation_memory.json  # Cached translations for reuse
+├── game_config.yaml         # Auto-generated game settings
+├── game_name_extracted.csv  # Extracted text
 ├── game_name_translated.csv # Translations (editable!)
 ├── game_name_translated.nes # Patched ROM
 └── game_name_translation.ips # IPS patch for distribution
@@ -528,18 +534,25 @@ FamiLator provides rich context to improve translation quality and consistency.
 
 ### ✅ Phase 5: Streamlined Workflow (COMPLETED)
 - ✅ **Unified CLI** (`familator translate/extract/apply/status/list`)
-- ✅ **One-command translation** \u2014 ROM + languages → translated patch
-- ✅ **Project management** \u2014 save/resume projects, track progress
-- ✅ **Edit & re-apply workflow** \u2014 manually refine translations
+- ✅ **One-command translation** — ROM + languages → translated patch
+- ✅ **Project management** — save/resume projects, track progress
+- ✅ **Edit & re-apply workflow** — manually refine translations
 - ✅ **Auto-config generation** for unknown ROMs
 - ✅ **Task runner shortcuts** for common operations
 
-### 🔄 Phase 6: Enhanced Detection (In Progress)
-- 📋 **Language-aware text detection** (Japanese vs English patterns)
-- 📋 **Improved LLM translation** with retry logic, batching, and context
-- 📋 **Glossary support** per-project terminology management
-- 📋 **Font compatibility checking** before translation
+### ✅ Phase 6: Enhanced Detection & Translation (COMPLETED)
+- ✅ **Language detection** — automatic Japanese/English detection via Unicode ranges
+- ✅ **Enhanced LLM translation** with retry logic (max 3 attempts) and exponential backoff
+- ✅ **Batch translation** — process multiple strings with context preservation
+- ✅ **Glossary support** — per-project terminology management with auto-save
+- ✅ **Translation memory** — cache and reuse previous translations
+- ✅ **Confidence scoring** — track translation quality metrics
+- ✅ **Progress tracking** — detailed timing and success/failure counts
+
+### 🔄 Phase 7: Font & Character Analysis (Planned)
 - 📋 **CHR ROM analysis** for available character detection
+- 📋 **Font compatibility checking** before translation
+- 📋 **Character substitution suggestions** for missing glyphs
 - 📋 **Web interface** for non-technical users
 
 ## 🚀 Quick Start Summary
