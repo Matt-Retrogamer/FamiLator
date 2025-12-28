@@ -32,11 +32,11 @@
                     <table class="table table-sm">
                         <tr>
                             <td class="text-muted">Type</td>
-                            <td>{{ chr_analysis.chr_type.value }}</td>
+                            <td>{{ chr_analysis.chr_type }}</td>
                         </tr>
                         <tr>
                             <td class="text-muted">Total Tiles</td>
-                            <td>{{ chr_analysis.tile_count }}</td>
+                            <td>{{ chr_analysis.total_tiles }}</td>
                         </tr>
                         <tr>
                             <td class="text-muted">Latin Font</td>
@@ -74,8 +74,8 @@
                             onclick="scrollToTile({{ region.start_tile }})">
                         <div class="d-flex justify-content-between">
                             <span>Region {{ loop.index }}</span>
-                            <span class="badge {% if region.is_latin_font %}bg-success{% else %}bg-info{% endif %}">
-                                {% if region.is_latin_font %}Latin{% else %}JP{% endif %}
+                            <span class="badge bg-info">
+                                {{ region.notes or 'Font' }}
                             </span>
                         </div>
                         <small class="text-muted">
@@ -125,7 +125,7 @@
                     <div class="input-group" style="width: 200px;">
                         <input type="number" class="form-control form-control-sm" 
                                placeholder="Go to tile..." id="gotoTile" min="0" 
-                               max="{{ chr_analysis.tile_count - 1 }}">
+                               max="{{ chr_analysis.total_tiles - 1 }}">
                         <button class="btn btn-outline-secondary btn-sm" onclick="goToTile()">
                             Go
                         </button>
@@ -266,7 +266,7 @@
 {% block extra_js %}
 <script>
     {% if chr_analysis %}
-    const tileCount = {{ chr_analysis.tile_count }};
+    const tileCount = {{ chr_analysis.total_tiles }};
     const fontRegions = {{ chr_analysis.font_regions | tojson }};
     {% else %}
     const tileCount = 0;

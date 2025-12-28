@@ -7,7 +7,7 @@
 [![Repo](https://img.shields.io/badge/github-Matt--Retrogamer%2FFamiLator-blue?logo=github)](https://github.com/Matt-Retrogamer/FamiLator)
 [![Python](https://img.shields.io/badge/python-3.9+-blue.svg)](https://python.org)
 [![UV](https://img.shields.io/badge/package%20manager-UV-blue)](https://github.com/astral-sh/uv)
-[![Tests](https://img.shields.io/badge/tests-144%20passing-green)](tests/)
+[![Tests](https://img.shields.io/badge/tests-163%20passing-green)](tests/)
 
 
 ## 🕹️ Project Overview
@@ -21,6 +21,7 @@ The project supports both simple games (_Tennis_) and complex titles with pointe
 - 🌐 **Language detection** — Automatic Japanese/English detection from extracted text
 - 🎨 **CHR ROM analysis** — Detect available tiles, font regions, and character sets
 - 🔤 **Font compatibility** — Validate and auto-fix translations for available glyphs
+- 🛠️ **Table Builder** — Visual tool for creating custom character encoding tables
 - 🧠 **Intelligent text detection** using pattern recognition and configurable encoding tables
 - 📤 **Multi-format export** to structured formats (CSV/JSON) with metadata preservation
 - 🤖 **LLM-powered translation** with retry logic, batch processing, and constraint validation
@@ -61,6 +62,7 @@ FamiLator/
 │   ├── extractor.py         # ROM text extraction with metadata preservation
 │   ├── font_checker.py      # Font compatibility validation & auto-fix
 │   ├── language_detector.py # Automatic Japanese/English language detection
+│   ├── table_builder.py     # Manual-assist encoding table builder
 │   ├── pointer_utils.py     # Pointer table manipulation utilities
 │   ├── reinjector.py        # Text reinsertion with pointer updates
 │   ├── translator.py        # Enhanced LLM translation with glossary & memory
@@ -242,6 +244,7 @@ python scripts/run_web.py --host 0.0.0.0 --port 8080
 | **ROM Analysis** | CHR tile analysis, language detection, font regions |
 | **Translation Editor** | Real-time editing with auto-save, length validation, progress tracking |
 | **Tile Browser** | Visual CHR grid with zoom, palette options, font region highlighting |
+| **Table Builder** | Create custom .tbl encoding files with visual tile reference and presets |
 | **Project Management** | Create, edit, delete projects; download outputs (CSV, IPS, ROM) |
 
 ### Web Workflow
@@ -265,6 +268,10 @@ The web interface exposes a REST API for programmatic access:
 | `/api/build_patch` | POST | Build IPS patch from translations |
 | `/api/validate` | POST | Validate translated ROM |
 | `/api/chr_tiles/<filename>` | GET | Get CHR tile metadata |
+| `/api/tables` | GET | List available encoding tables |
+| `/api/table/save` | POST | Save new encoding table |
+| `/api/table/load/<name>` | GET | Load existing table for editing |
+| `/api/table/presets` | GET | Get character set presets (A-Z, 0-9, etc.) |
 
 ### Example API Usage
 ```bash
@@ -326,7 +333,7 @@ familator apply --project output/game_en
 
 FamiLator includes comprehensive testing to ensure reliability and data integrity.
 
-### Test Suite (144 Tests - All Passing ✅)
+### Test Suite (163 Tests - All Passing ✅)
 ```bash
 # Run all tests
 task test
@@ -339,6 +346,7 @@ task test
 # - test_translator.py (26 tests)  — Translation, glossary, memory
 # - test_chr_analyzer.py (25)      — CHR ROM tile analysis
 # - test_font_checker.py (28)      — Font compatibility validation
+# - test_table_builder.py (19)     — Encoding table builder
 # - test_web.py (24 tests)         — Web interface routes & API
 ```
 
@@ -644,6 +652,13 @@ FamiLator provides rich context to improve translation quality and consistency.
 - ✅ **Project management UI** — Create, edit, delete projects from browser
 - ✅ **ROM analysis dashboard** — Language detection, CHR analysis, font compatibility
 - ✅ **REST API** — Programmatic access to all FamiLator features
+
+### ✅ Phase 9: Table Builder (COMPLETED)
+- ✅ **Manual-assist table builder** — Create .tbl encoding files with visual workflow
+- ✅ **Character presets** — Quick-add A-Z, a-z, 0-9, and common control codes
+- ✅ **ROM tile reference** — View CHR tiles while building tables
+- ✅ **Load/save tables** — Edit existing tables or create new ones
+- ✅ **Control code support** — Define <END>, <NEWLINE>, <WAIT> markers
 
 ## � TODO / Roadmap
 

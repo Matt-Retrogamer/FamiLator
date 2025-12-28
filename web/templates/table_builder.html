@@ -1,0 +1,601 @@
+{% extends "base.html" %}
+
+{% block title %}Table Builder - FamiLator{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="row mb-4">
+        <div class="col-12">
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a href="{{ url_for('main.index') }}">Home</a></li>
+                    <li class="breadcrumb-item active">Table Builder</li>
+                </ol>
+            </nav>
+            <h3>
+                <i class="bi bi-table text-warning"></i>
+                Encoding Table Builder
+            </h3>
+            <p class="text-muted">
+                Create character encoding tables by mapping tile indices to characters.
+                NES games use custom encodings - use the tile viewer to identify which tiles 
+                represent which characters.
+            </p>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Left Panel: Settings & Presets -->
+        <div class="col-md-3">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-gear"></i> Table Settings</h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label class="form-label">Table Name</label>
+                        <input type="text" class="form-control" id="tableName" 
+                               placeholder="e.g., zelda" 
+                               value="{{ rom_filename.replace('.nes', '') if rom_filename else '' }}">
+                        <small class="text-muted">Will be saved as tables/[name].tbl</small>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Reference ROM (optional)</label>
+                        <select class="form-select" id="romSelect" onchange="loadRomTiles()">
+                            <option value="">Select ROM to view tiles...</option>
+                            {% for rom in rom_files %}
+                            <option value="{{ rom }}" {% if rom == rom_filename %}selected{% endif %}>
+                                {{ rom }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Load Existing Table</label>
+                        <select class="form-select" id="existingTable" onchange="loadExistingTable()">
+                            <option value="">Start fresh...</option>
+                            {% for table in tables %}
+                            <option value="{{ table.path }}">{{ table.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Quick Add Presets -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-lightning"></i> Quick Add</h5>
+                </div>
+                <div class="card-body">
+                    <p class="small text-muted">Add common character sets starting at a byte:</p>
+                    
+                    <div class="input-group mb-3">
+                        <span class="input-group-text">0x</span>
+                        <input type="text" class="form-control" id="presetStartByte" 
+                               value="00" maxlength="2" style="width: 60px;">
+                    </div>
+                    
+                    <div class="d-grid gap-2">
+                        <button class="btn btn-outline-secondary btn-sm" onclick="addPreset('uppercase')">
+                            A-Z (uppercase)
+                        </button>
+                        <button class="btn btn-outline-secondary btn-sm" onclick="addPreset('lowercase')">
+                            a-z (lowercase)
+                        </button>
+                        <button class="btn btn-outline-secondary btn-sm" onclick="addPreset('digits')">
+                            0-9 (digits)
+                        </button>
+                        <button class="btn btn-outline-secondary btn-sm" onclick="addPreset('space')">
+                            Space only
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Control Codes -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-code-slash"></i> Control Codes</h5>
+                </div>
+                <div class="card-body">
+                    <p class="small text-muted">Common terminator/formatting bytes:</p>
+                    <div class="d-grid gap-2">
+                        <button class="btn btn-outline-info btn-sm" onclick="addControlCode('FF', '<END>')">
+                            FF = &lt;END&gt;
+                        </button>
+                        <button class="btn btn-outline-info btn-sm" onclick="addControlCode('FE', '<NEWLINE>')">
+                            FE = &lt;NEWLINE&gt;
+                        </button>
+                        <button class="btn btn-outline-info btn-sm" onclick="addControlCode('00', '<NULL>')">
+                            00 = &lt;NULL&gt;
+                        </button>
+                        <button class="btn btn-outline-info btn-sm" onclick="addControlCode('FD', '<WAIT>')">
+                            FD = &lt;WAIT&gt;
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Middle Panel: Mapping Editor -->
+        <div class="col-md-5">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="bi bi-pencil"></i> Character Mappings</h5>
+                    <span class="badge bg-info" id="mappingCount">0 mappings</span>
+                </div>
+                <div class="card-body">
+                    <!-- Add Single Mapping -->
+                    <div class="row mb-3">
+                        <div class="col-4">
+                            <div class="input-group">
+                                <span class="input-group-text">0x</span>
+                                <input type="text" class="form-control" id="newByte" 
+                                       placeholder="00" maxlength="2">
+                            </div>
+                        </div>
+                        <div class="col-1 text-center pt-2">=</div>
+                        <div class="col-4">
+                            <input type="text" class="form-control" id="newChar" 
+                                   placeholder="A" maxlength="10">
+                        </div>
+                        <div class="col-3">
+                            <button class="btn btn-success w-100" onclick="addMapping()">
+                                <i class="bi bi-plus"></i> Add
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <hr>
+                    
+                    <!-- Mappings Table -->
+                    <div class="table-responsive" style="max-height: 500px; overflow-y: auto;">
+                        <table class="table table-sm table-hover" id="mappingsTable">
+                            <thead class="sticky-top bg-dark">
+                                <tr>
+                                    <th style="width: 80px;">Byte</th>
+                                    <th>Character</th>
+                                    <th style="width: 60px;">Type</th>
+                                    <th style="width: 40px;"></th>
+                                </tr>
+                            </thead>
+                            <tbody id="mappingsBody">
+                                <tr class="text-muted">
+                                    <td colspan="4" class="text-center py-4">
+                                        No mappings yet. Add characters above or use Quick Add presets.
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="card-footer">
+                    <div class="d-flex justify-content-between">
+                        <button class="btn btn-outline-danger" onclick="clearMappings()">
+                            <i class="bi bi-trash"></i> Clear All
+                        </button>
+                        <button class="btn btn-nes" onclick="saveTable()">
+                            <i class="bi bi-save"></i> Save Table
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Panel: Tile Preview -->
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-grid-3x3"></i> Tile Reference</h5>
+                </div>
+                <div class="card-body">
+                    {% if chr_analysis %}
+                    <div class="mb-3">
+                        <small class="text-muted">
+                            {{ chr_analysis.total_tiles }} tiles found
+                            {% if chr_analysis.font_regions %}
+                            | Font regions: 
+                            {% for r in chr_analysis.font_regions %}
+                            {{ r.start_tile }}-{{ r.end_tile }}{% if not loop.last %}, {% endif %}
+                            {% endfor %}
+                            {% endif %}
+                        </small>
+                    </div>
+                    {% endif %}
+                    
+                    <div id="tilePreviewArea">
+                        {% if rom_filename %}
+                        <p class="text-muted small">
+                            <i class="bi bi-info-circle"></i> 
+                            Tiles will be rendered here. Click a tile to add its index to the mapping.
+                        </p>
+                        <div id="tileGrid" class="tile-grid-mini">
+                            <!-- Tiles rendered via JavaScript -->
+                            <div class="text-center py-3">
+                                <div class="spinner-border spinner-border-sm" role="status"></div>
+                                <span class="ms-2">Loading tiles...</span>
+                            </div>
+                        </div>
+                        {% else %}
+                        <div class="text-center text-muted py-5">
+                            <i class="bi bi-image display-4"></i>
+                            <p class="mt-3">Select a ROM above to view CHR tiles</p>
+                        </div>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="mt-3">
+                        <a href="{{ url_for('main.tile_browser', project_name=rom_filename.replace('.nes', '') if rom_filename else 'test') }}" 
+                           class="btn btn-outline-secondary w-100" target="_blank">
+                            <i class="bi bi-box-arrow-up-right"></i> Open Full Tile Browser
+                        </a>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Help Card -->
+            <div class="card mt-4">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-question-circle"></i> How to Use</h5>
+                </div>
+                <div class="card-body small">
+                    <ol class="mb-0">
+                        <li class="mb-2">Select a ROM to view its CHR tiles</li>
+                        <li class="mb-2">Open the <strong>Tile Browser</strong> to find font tiles</li>
+                        <li class="mb-2">Note which tile index corresponds to each character</li>
+                        <li class="mb-2">Use <strong>Quick Add</strong> to add A-Z starting at that tile index</li>
+                        <li class="mb-2">Add individual mappings for special characters</li>
+                        <li class="mb-2">Add control codes for line breaks, end markers, etc.</li>
+                        <li>Save the table and use it for text extraction</li>
+                    </ol>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Save Success Modal -->
+<div class="modal fade" id="saveSuccessModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content bg-dark">
+            <div class="modal-header">
+                <h5 class="modal-title text-success">
+                    <i class="bi bi-check-circle"></i> Table Saved
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>Your encoding table has been saved successfully!</p>
+                <p class="mb-0"><strong>Path:</strong> <code id="savedTablePath"></code></p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    .tile-grid-mini {
+        display: grid;
+        grid-template-columns: repeat(16, 24px);
+        gap: 2px;
+        max-height: 400px;
+        overflow-y: auto;
+        padding: 8px;
+        background: #1a1a1a;
+        border-radius: 4px;
+    }
+    
+    .tile-mini {
+        width: 24px;
+        height: 24px;
+        border: 1px solid #333;
+        cursor: pointer;
+        image-rendering: pixelated;
+    }
+    
+    .tile-mini:hover {
+        border-color: #e60012;
+        transform: scale(1.2);
+        z-index: 10;
+    }
+    
+    .tile-mini.selected {
+        border: 2px solid #4CAF50;
+    }
+    
+    #mappingsTable tbody tr:hover {
+        background: rgba(230, 0, 18, 0.1);
+    }
+    
+    .mapping-char {
+        font-family: monospace;
+        font-size: 1.2em;
+    }
+    
+    .mapping-control {
+        color: #4fc3f7;
+    }
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Current mappings storage
+    let mappings = {};  // byte (int) -> char
+    let controlCodes = {};  // byte (int) -> code string
+    
+    // Initialize
+    document.addEventListener('DOMContentLoaded', function() {
+        {% if rom_filename %}
+        loadTilePreview();
+        {% endif %}
+        updateMappingsDisplay();
+    });
+    
+    function loadRomTiles() {
+        const rom = document.getElementById('romSelect').value;
+        if (rom) {
+            window.location.href = `/table-builder/${encodeURIComponent(rom)}`;
+        }
+    }
+    
+    async function loadExistingTable() {
+        const tablePath = document.getElementById('existingTable').value;
+        if (!tablePath) return;
+        
+        const tableName = tablePath.split('/').pop().replace('.tbl', '');
+        
+        try {
+            const response = await fetch(`/api/table/load/${tableName}`);
+            const data = await response.json();
+            
+            if (data.success) {
+                // Convert hex keys back to int
+                mappings = {};
+                controlCodes = {};
+                
+                for (const [hex, char] of Object.entries(data.mappings)) {
+                    mappings[parseInt(hex, 16)] = char;
+                }
+                for (const [hex, code] of Object.entries(data.control_codes)) {
+                    controlCodes[parseInt(hex, 16)] = code;
+                }
+                
+                document.getElementById('tableName').value = data.name;
+                updateMappingsDisplay();
+            } else {
+                alert('Error loading table: ' + data.error);
+            }
+        } catch (error) {
+            alert('Error loading table: ' + error);
+        }
+    }
+    
+    function addMapping() {
+        const byteHex = document.getElementById('newByte').value.toUpperCase();
+        const char = document.getElementById('newChar').value;
+        
+        if (!byteHex || !char) {
+            alert('Please enter both byte value and character');
+            return;
+        }
+        
+        const byteVal = parseInt(byteHex, 16);
+        if (isNaN(byteVal) || byteVal < 0 || byteVal > 255) {
+            alert('Invalid byte value (must be 00-FF)');
+            return;
+        }
+        
+        // Check if it's a control code
+        if (char.startsWith('<') && char.endsWith('>')) {
+            controlCodes[byteVal] = char;
+        } else {
+            mappings[byteVal] = char;
+        }
+        
+        // Clear inputs
+        document.getElementById('newByte').value = '';
+        document.getElementById('newChar').value = '';
+        document.getElementById('newByte').focus();
+        
+        updateMappingsDisplay();
+    }
+    
+    function addPreset(type) {
+        const startByte = parseInt(document.getElementById('presetStartByte').value, 16);
+        if (isNaN(startByte)) {
+            alert('Invalid start byte');
+            return;
+        }
+        
+        let chars = [];
+        switch(type) {
+            case 'uppercase':
+                chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
+                break;
+            case 'lowercase':
+                chars = 'abcdefghijklmnopqrstuvwxyz'.split('');
+                break;
+            case 'digits':
+                chars = '0123456789'.split('');
+                break;
+            case 'space':
+                mappings[startByte] = ' ';
+                updateMappingsDisplay();
+                return;
+        }
+        
+        for (let i = 0; i < chars.length; i++) {
+            const byteVal = (startByte + i) & 0xFF;
+            mappings[byteVal] = chars[i];
+        }
+        
+        updateMappingsDisplay();
+    }
+    
+    function addControlCode(hex, code) {
+        const byteVal = parseInt(hex, 16);
+        controlCodes[byteVal] = code;
+        updateMappingsDisplay();
+    }
+    
+    function removeMapping(byteVal) {
+        delete mappings[byteVal];
+        delete controlCodes[byteVal];
+        updateMappingsDisplay();
+    }
+    
+    function clearMappings() {
+        if (confirm('Clear all mappings?')) {
+            mappings = {};
+            controlCodes = {};
+            updateMappingsDisplay();
+        }
+    }
+    
+    function updateMappingsDisplay() {
+        const tbody = document.getElementById('mappingsBody');
+        const totalMappings = Object.keys(mappings).length + Object.keys(controlCodes).length;
+        
+        document.getElementById('mappingCount').textContent = `${totalMappings} mappings`;
+        
+        if (totalMappings === 0) {
+            tbody.innerHTML = `
+                <tr class="text-muted">
+                    <td colspan="4" class="text-center py-4">
+                        No mappings yet. Add characters above or use Quick Add presets.
+                    </td>
+                </tr>
+            `;
+            return;
+        }
+        
+        // Combine and sort all entries
+        const allEntries = [];
+        for (const [byte, char] of Object.entries(mappings)) {
+            allEntries.push({ byte: parseInt(byte), value: char, isControl: false });
+        }
+        for (const [byte, code] of Object.entries(controlCodes)) {
+            allEntries.push({ byte: parseInt(byte), value: code, isControl: true });
+        }
+        allEntries.sort((a, b) => a.byte - b.byte);
+        
+        let html = '';
+        for (const entry of allEntries) {
+            const hexByte = entry.byte.toString(16).toUpperCase().padStart(2, '0');
+            const displayValue = entry.value === ' ' ? '(space)' : entry.value;
+            const typeClass = entry.isControl ? 'mapping-control' : 'mapping-char';
+            const typeBadge = entry.isControl ? 
+                '<span class="badge bg-info">ctrl</span>' : 
+                '<span class="badge bg-secondary">char</span>';
+            
+            html += `
+                <tr>
+                    <td><code>0x${hexByte}</code></td>
+                    <td class="${typeClass}">${escapeHtml(displayValue)}</td>
+                    <td>${typeBadge}</td>
+                    <td>
+                        <button class="btn btn-outline-danger btn-sm" onclick="removeMapping(${entry.byte})">
+                            <i class="bi bi-x"></i>
+                        </button>
+                    </td>
+                </tr>
+            `;
+        }
+        
+        tbody.innerHTML = html;
+    }
+    
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+    
+    async function saveTable() {
+        const tableName = document.getElementById('tableName').value.trim();
+        if (!tableName) {
+            alert('Please enter a table name');
+            return;
+        }
+        
+        const totalMappings = Object.keys(mappings).length + Object.keys(controlCodes).length;
+        if (totalMappings === 0) {
+            alert('Please add at least one mapping');
+            return;
+        }
+        
+        // Convert int keys to hex strings for API
+        const hexMappings = {};
+        const hexCodes = {};
+        
+        for (const [byte, char] of Object.entries(mappings)) {
+            const hex = parseInt(byte).toString(16).toUpperCase().padStart(2, '0');
+            hexMappings[hex] = char;
+        }
+        for (const [byte, code] of Object.entries(controlCodes)) {
+            const hex = parseInt(byte).toString(16).toUpperCase().padStart(2, '0');
+            hexCodes[hex] = code;
+        }
+        
+        try {
+            const response = await fetch('/api/table/save', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    table_name: tableName,
+                    mappings: hexMappings,
+                    control_codes: hexCodes
+                })
+            });
+            
+            const result = await response.json();
+            
+            if (result.success) {
+                document.getElementById('savedTablePath').textContent = result.table_path;
+                new bootstrap.Modal(document.getElementById('saveSuccessModal')).show();
+            } else {
+                alert('Error saving table: ' + result.error);
+            }
+        } catch (error) {
+            alert('Error saving table: ' + error);
+        }
+    }
+    
+    async function loadTilePreview() {
+        const rom = document.getElementById('romSelect').value;
+        if (!rom) return;
+        
+        // For now, show a placeholder - full tile rendering requires canvas work
+        const grid = document.getElementById('tileGrid');
+        if (!grid) return;
+        
+        grid.innerHTML = `
+            <div class="text-center py-3 text-muted">
+                <p><i class="bi bi-info-circle"></i> Use the full Tile Browser for detailed tile viewing.</p>
+                <p class="small">Click "Open Full Tile Browser" below to see all CHR tiles.</p>
+            </div>
+        `;
+    }
+    
+    // Handle Enter key in input fields
+    document.getElementById('newByte')?.addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+            document.getElementById('newChar').focus();
+        }
+    });
+    
+    document.getElementById('newChar')?.addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+            addMapping();
+        }
+    });
+</script>
+{% endblock %}

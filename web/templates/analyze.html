@@ -31,12 +31,12 @@
                         <tr>
                             <td class="text-muted">CHR Type</td>
                             <td>
-                                <span class="badge bg-info">{{ chr_analysis.chr_type.value }}</span>
+                                <span class="badge bg-info">{{ chr_analysis.chr_type }}</span>
                             </td>
                         </tr>
                         <tr>
                             <td class="text-muted">Tile Count</td>
-                            <td>{{ chr_analysis.tile_count }}</td>
+                            <td>{{ chr_analysis.total_tiles }}</td>
                         </tr>
                         <tr>
                             <td class="text-muted">Font Regions</td>
@@ -162,12 +162,12 @@
                                     <td>{{ loop.index }}</td>
                                     <td>0x{{ '%04X'|format(region.start_tile) }}</td>
                                     <td>0x{{ '%04X'|format(region.end_tile) }}</td>
-                                    <td>{{ region.end_tile - region.start_tile }}</td>
+                                    <td>{{ region.tile_count }}</td>
                                     <td>
-                                        {% if region.is_latin_font %}
-                                            <span class="badge bg-success">Latin</span>
+                                        {% if region.notes %}
+                                            <span class="badge bg-info">{{ region.notes }}</span>
                                         {% else %}
-                                            <span class="badge bg-info">Japanese</span>
+                                            <span class="badge bg-secondary">Font</span>
                                         {% endif %}
                                     </td>
                                 </tr>
@@ -198,11 +198,22 @@
                 </div>
                 <div class="mb-3">
                     <label class="form-label">Character Table</label>
-                    <select class="form-select" id="tableFile">
-                        <option value="tables/common.tbl">Common (default)</option>
-                        <option value="tables/tennis.tbl">Tennis</option>
-                        <option value="tables/zelda.tbl">Zelda</option>
-                    </select>
+                    <div class="input-group">
+                        <select class="form-select" id="tableFile">
+                            <option value="tables/common.tbl">Loading tables...</option>
+                        </select>
+                        <button type="button" class="btn btn-outline-warning" onclick="generateTable()" 
+                                title="Auto-generate table based on ROM analysis">
+                            <i class="bi bi-magic"></i> Generate
+                        </button>
+                    </div>
+                    <small class="text-muted">
+                        Auto-generate a table based on detected language: 
+                        <strong id="detectedLang">{{ lang_analysis.primary_language.value }}</strong>
+                    </small>
+                </div>
+                <div id="tableGenStatus" class="alert alert-info d-none">
+                    <i class="bi bi-hourglass-split"></i> <span id="tableGenMessage">Generating table...</span>
                 </div>
             </div>
             <div class="modal-footer">
@@ -219,6 +230,76 @@
 {% block extra_js %}
 <script>
     const filename = "{{ filename }}";
+    const detectedLanguage = "{{ lang_analysis.primary_language.value }}";
+    
+    // Load available tables on page load
+    document.addEventListener('DOMContentLoaded', loadTables);
+    
+    async function loadTables() {
+        try {
+            const response = await fetch('/api/tables');
+            const data = await response.json();
+            
+            const select = document.getElementById('tableFile');
+            select.innerHTML = '';
+            
+            if (data.tables && data.tables.length > 0) {
+                data.tables.forEach(table => {
+                    const option = document.createElement('option');
+                    option.value = table.path;
+                    option.textContent = table.name;
+                    if (table.path === 'tables/common.tbl') {
+                        option.textContent += ' (default)';
+                    }
+                    select.appendChild(option);
+                });
+            } else {
+                select.innerHTML = '<option value="tables/common.tbl">Common (default)</option>';
+            }
+        } catch (error) {
+            console.error('Error loading tables:', error);
+        }
+    }
+    
+    async function generateTable() {
+        const statusDiv = document.getElementById('tableGenStatus');
+        const statusMsg = document.getElementById('tableGenMessage');
+        const projectName = document.getElementById('projectName').value;
+        
+        statusDiv.classList.remove('d-none', 'alert-success', 'alert-danger');
+        statusDiv.classList.add('alert-info');
+        statusMsg.innerHTML = '<i class="bi bi-hourglass-split"></i> Generating table for ' + projectName + '...';
+        
+        try {
+            const response = await fetch('/api/generate-table', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    rom_filename: filename,
+                    game_name: projectName,
+                    language: detectedLanguage
+                })
+            });
+            
+            const result = await response.json();
+            
+            if (result.success) {
+                statusDiv.classList.remove('alert-info');
+                statusDiv.classList.add('alert-success');
+                statusMsg.innerHTML = `<i class="bi bi-check-circle"></i> Generated table with ${result.mappings_count} character mappings (${result.language})`;
+                
+                // Reload tables and select the new one
+                await loadTables();
+                document.getElementById('tableFile').value = result.table_path;
+            } else {
+                throw new Error(result.error);
+            }
+        } catch (error) {
+            statusDiv.classList.remove('alert-info');
+            statusDiv.classList.add('alert-danger');
+            statusMsg.innerHTML = '<i class="bi bi-x-circle"></i> Error: ' + error.message;
+        }
+    }
     
     function createProject() {
         new bootstrap.Modal(document.getElementById('createProjectModal')).show();

@@ -36,8 +36,9 @@ from src.chr_analyzer import CHRAnalyzer
 from src.encoding import EncodingTable
 from src.extractor import TextExtractor
 from src.font_checker import FontChecker
-from src.language_detector import LanguageDetector
+from src.language_detector import Language, LanguageDetector
 from src.reinjector import TextReinjector
+from src.table_builder import TableBuilder
 from src.translator import GameTranslator, Glossary, TranslationConfig, TranslationMemory
 from src.validator import ROMValidator
 
@@ -180,6 +181,27 @@ def get_project_list() -> list[dict]:
     return projects
 
 
+def get_available_tables() -> List[Dict[str, str]]:
+    """Get list of available encoding tables.
+    
+    Returns:
+        List of dicts with 'name' and 'path' keys
+    """
+    project_root = Path(__file__).parent.parent
+    tables_dir = project_root / "tables"
+    
+    tables = []
+    if tables_dir.exists():
+        for tbl_file in sorted(tables_dir.glob("*.tbl")):
+            tables.append({
+                "name": tbl_file.stem.replace("_", " ").title(),
+                "path": f"tables/{tbl_file.name}",
+            })
+    
+    logger.debug(f"Found {len(tables)} encoding tables")
+    return tables
+
+
 def create_temp_config(
     rom_path: str,
     table_file: str = "tables/common.tbl",
@@ -298,13 +320,76 @@ def analyze(filename: str):
     try:
         # Perform CHR analysis
         chr_analyzer = CHRAnalyzer()
-        chr_analysis = chr_analyzer.analyze_rom(rom_path)
+        chr_analysis_raw = chr_analyzer.analyze_rom(rom_path)
+        
+        # Convert CHRAnalysis dataclass to JSON-serializable dict
+        chr_analysis = {
+            "chr_type": chr_analysis_raw.chr_type.value,
+            "chr_size": chr_analysis_raw.chr_size,
+            "total_tiles": chr_analysis_raw.total_tiles,
+            "blank_tiles": chr_analysis_raw.blank_tiles,
+            "unique_tiles": chr_analysis_raw.unique_tiles,
+            "font_regions": [
+                {
+                    "start_tile": r.start_tile,
+                    "end_tile": r.end_tile,
+                    "tile_count": r.tile_count,
+                    "estimated_chars": r.estimated_chars,
+                    "char_width": r.char_width,
+                    "char_height": r.char_height,
+                    "notes": r.notes,
+                }
+                for r in chr_analysis_raw.font_regions
+            ],
+            "available_chars": list(chr_analysis_raw.available_chars),  # Convert set to list
+            "estimated_charset_size": chr_analysis_raw.estimated_charset_size,
+            "warnings": chr_analysis_raw.warnings,
+            "has_latin_font": chr_analysis_raw.has_latin_font(),
+            "has_extended_charset": chr_analysis_raw.has_extended_charset(),
+        }
 
         # Detect language from ROM byte patterns
         lang_detector = LanguageDetector()
         with open(rom_path, "rb") as f:
             rom_data = f.read()
-        lang_analysis = lang_detector.analyze_byte_patterns(rom_data)
+        byte_analysis = lang_detector.analyze_byte_patterns(rom_data)
+        
+        # Build a JSON-serializable dict with attributes the template expects
+        likely_encoding = byte_analysis.get("likely_encoding", "unknown")
+        if likely_encoding == "japanese":
+            detected_lang = Language.JAPANESE
+            confidence = 0.7
+        elif likely_encoding == "ascii":
+            detected_lang = Language.ENGLISH
+            confidence = byte_analysis.get("ascii_ratio", 0.5)
+        else:
+            detected_lang = Language.UNKNOWN
+            confidence = 0.3
+        
+        # Create a dict-based object that supports both attribute and key access for template
+        class AttrDict(dict):
+            """Dict that allows attribute access for Jinja2 template compatibility."""
+            def __getattr__(self, key):
+                try:
+                    return self[key]
+                except KeyError:
+                    raise AttributeError(key)
+        
+        # Nested dict for primary_language to support .value access in template
+        primary_language = AttrDict({"value": detected_lang.value})
+        
+        lang_analysis = AttrDict({
+            "primary_language": primary_language,
+            "detected_language": primary_language,  # alias
+            "confidence": confidence,
+            "japanese_ratio": byte_analysis.get("japanese_indicators", 0) / 2,
+            "english_ratio": byte_analysis.get("ascii_ratio", 0),
+            "details": byte_analysis,
+            "hiragana_count": 0,
+            "katakana_count": 0,
+            "kanji_count": 0,
+            "ascii_count": int(byte_analysis.get("ascii_ratio", 0) * byte_analysis.get("total_bytes", 0)),
+        })
 
         logger.info(f"Analysis complete for {filename}")
         return render_template(
@@ -384,7 +469,33 @@ def tile_browser(project_name: str):
     if rom_path:
         try:
             chr_analyzer = CHRAnalyzer()
-            chr_analysis = chr_analyzer.analyze_rom(rom_path)
+            chr_analysis_raw = chr_analyzer.analyze_rom(rom_path)
+            
+            # Convert CHRAnalysis dataclass to JSON-serializable dict
+            chr_analysis = {
+                "chr_type": chr_analysis_raw.chr_type.value,
+                "chr_size": chr_analysis_raw.chr_size,
+                "total_tiles": chr_analysis_raw.total_tiles,
+                "blank_tiles": chr_analysis_raw.blank_tiles,
+                "unique_tiles": chr_analysis_raw.unique_tiles,
+                "font_regions": [
+                    {
+                        "start_tile": r.start_tile,
+                        "end_tile": r.end_tile,
+                        "tile_count": r.tile_count,
+                        "estimated_chars": r.estimated_chars,
+                        "char_width": r.char_width,
+                        "char_height": r.char_height,
+                        "notes": r.notes,
+                    }
+                    for r in chr_analysis_raw.font_regions
+                ],
+                "available_chars": list(chr_analysis_raw.available_chars),
+                "estimated_charset_size": chr_analysis_raw.estimated_charset_size,
+                "warnings": chr_analysis_raw.warnings,
+                "has_latin_font": chr_analysis_raw.has_latin_font(),
+                "has_extended_charset": chr_analysis_raw.has_extended_charset(),
+            }
         except Exception as e:
             logger.error(f"Error analyzing CHR for {project_name}: {e}")
 
@@ -393,9 +504,196 @@ def tile_browser(project_name: str):
     )
 
 
+@main_bp.route("/table-builder")
+@main_bp.route("/table-builder/<rom_filename>")
+def table_builder(rom_filename: str = None):
+    """Table builder page for creating encoding tables."""
+    rom_files = []
+    chr_analysis = None
+    
+    # Get list of available ROMs
+    rom_folder = get_rom_folder()
+    if rom_folder.exists():
+        rom_files = [f.name for f in rom_folder.glob("*.nes")]
+    
+    # Get list of existing tables
+    tables = get_available_tables()
+    
+    # If a ROM is specified, analyze it
+    if rom_filename:
+        rom_path = find_rom_file(rom_filename)
+        if rom_path:
+            try:
+                chr_analyzer = CHRAnalyzer()
+                chr_analysis_raw = chr_analyzer.analyze_rom(rom_path)
+                chr_analysis = {
+                    "chr_type": chr_analysis_raw.chr_type.value,
+                    "total_tiles": chr_analysis_raw.total_tiles,
+                    "font_regions": [
+                        {
+                            "start_tile": r.start_tile,
+                            "end_tile": r.end_tile,
+                            "tile_count": r.tile_count,
+                        }
+                        for r in chr_analysis_raw.font_regions
+                    ],
+                }
+            except Exception as e:
+                logger.error(f"Error analyzing CHR for table builder: {e}")
+    
+    return render_template(
+        "table_builder.html",
+        rom_filename=rom_filename,
+        rom_files=rom_files,
+        tables=tables,
+        chr_analysis=chr_analysis,
+    )
+
+
 # ============================================================================
 # API Routes
 # ============================================================================
+
+
+@api_bp.route("/tables", methods=["GET"])
+def api_list_tables():
+    """List available encoding tables."""
+    tables = get_available_tables()
+    return jsonify({"tables": tables})
+
+
+@api_bp.route("/generate-table", methods=["POST"])
+def api_generate_table():
+    """Create an empty table template for a ROM - user fills in mappings manually."""
+    data = request.get_json()
+    rom_filename = data.get("rom_filename")
+    game_name = data.get("game_name")
+    
+    if not rom_filename and not game_name:
+        logger.warning("Generate table API called without ROM filename or game name")
+        return jsonify({"error": "ROM filename or game name required"}), 400
+    
+    if not game_name:
+        rom_path = find_rom_file(rom_filename)
+        if rom_path:
+            game_name = rom_path.stem
+        else:
+            game_name = rom_filename.replace(".nes", "")
+    
+    try:
+        logger.info(f"Creating empty table template for {game_name}")
+        
+        builder = TableBuilder()
+        
+        # Create a starter table with common control codes only
+        # User will add character mappings via the Table Builder UI
+        result = builder.create_table(
+            game_name,
+            mappings={},  # Empty - user fills in
+            control_codes={
+                0xFF: "<END>",
+                0xFE: "<NEWLINE>",
+            },
+            description="Edit this table in the Table Builder to add character mappings",
+        )
+        
+        logger.info(f"Created table template: {result.table_path}")
+        
+        return jsonify({
+            "success": result.success,
+            "table_path": result.table_path,
+            "mappings_count": result.mappings_count,
+            "control_codes_count": result.control_codes_count,
+            "message": result.message,
+        })
+    
+    except Exception as e:
+        logger.exception(f"Error creating table for {game_name}")
+        return jsonify({"error": str(e)}), 500
+
+
+@api_bp.route("/table/save", methods=["POST"])
+def api_save_table():
+    """Save character mappings to a table file."""
+    data = request.get_json()
+    table_name = data.get("table_name")
+    mappings = data.get("mappings", {})
+    control_codes = data.get("control_codes", {})
+    
+    if not table_name:
+        return jsonify({"error": "Table name required"}), 400
+    
+    try:
+        # Convert string keys to int (JSON keys are always strings)
+        int_mappings = {int(k, 16) if isinstance(k, str) else k: v for k, v in mappings.items()}
+        int_codes = {int(k, 16) if isinstance(k, str) else k: v for k, v in control_codes.items()}
+        
+        builder = TableBuilder()
+        result = builder.create_table(
+            table_name,
+            int_mappings,
+            int_codes,
+        )
+        
+        logger.info(f"Saved table: {result.table_path} with {result.mappings_count} mappings")
+        
+        return jsonify({
+            "success": result.success,
+            "table_path": result.table_path,
+            "mappings_count": result.mappings_count,
+            "control_codes_count": result.control_codes_count,
+            "message": result.message,
+        })
+    
+    except Exception as e:
+        logger.exception(f"Error saving table {table_name}")
+        return jsonify({"error": str(e)}), 500
+
+
+@api_bp.route("/table/load/<table_name>")
+def api_load_table(table_name: str):
+    """Load a table file for editing."""
+    project_root = Path(__file__).parent.parent
+    table_path = project_root / "tables" / f"{table_name}.tbl"
+    
+    if not table_path.exists():
+        return jsonify({"error": f"Table not found: {table_name}"}), 404
+    
+    try:
+        builder = TableBuilder()
+        table_data = builder.load_table(str(table_path))
+        
+        if not table_data:
+            return jsonify({"error": "Failed to load table"}), 500
+        
+        # Convert int keys to hex strings for JSON
+        hex_mappings = {f"{k:02X}": v for k, v in table_data.mappings.items()}
+        hex_codes = {f"{k:02X}": v for k, v in table_data.control_codes.items()}
+        
+        return jsonify({
+            "success": True,
+            "name": table_data.name,
+            "mappings": hex_mappings,
+            "control_codes": hex_codes,
+        })
+    
+    except Exception as e:
+        logger.exception(f"Error loading table {table_name}")
+        return jsonify({"error": str(e)}), 500
+
+
+@api_bp.route("/table/presets")
+def api_table_presets():
+    """Get available mapping presets."""
+    builder = TableBuilder()
+    presets = builder.get_common_presets()
+    
+    # Convert to JSON-friendly format
+    result = {}
+    for name, mappings in presets.items():
+        result[name] = {f"{k:02X}": v for k, v in mappings.items()}
+    
+    return jsonify({"presets": result})
 
 
 @api_bp.route("/extract", methods=["POST"])
@@ -885,8 +1183,34 @@ def api_chr_tiles(filename: str):
 @projects_bp.route("/")
 def list_projects():
     """List all projects."""
+    logger.debug("Listing projects")
     projects = get_project_list()
+    logger.info(f"Found {len(projects)} projects")
     return render_template("projects.html", projects=projects)
+
+
+@projects_bp.route("/<project_name>")
+def view_project(project_name: str):
+    """View project details - redirects to translate page."""
+    logger.info(f"Viewing project: {project_name}")
+    
+    # Check if project exists
+    output_folder = get_output_folder()
+    project_path = output_folder / project_name
+    
+    if project_path.is_dir():
+        logger.debug(f"Project directory exists: {project_path}")
+        return redirect(url_for("main.translate", project_name=project_name))
+    
+    # Check for legacy single-file projects
+    extracted_file = output_folder / f"{project_name}_extracted.json"
+    if extracted_file.exists():
+        logger.debug(f"Legacy project file exists: {extracted_file}")
+        return redirect(url_for("main.translate", project_name=project_name))
+    
+    logger.warning(f"Project not found: {project_name}")
+    flash(f"Project '{project_name}' not found", "error")
+    return redirect(url_for("projects.list_projects"))
 
 
 @projects_bp.route("/new", methods=["GET", "POST"])
@@ -896,8 +1220,11 @@ def new_project():
         rom_filename = request.form.get("rom_file")
         project_name = request.form.get("project_name")
         table_file = request.form.get("table_file", "tables/common.tbl")
+        
+        logger.info(f"Creating new project: {project_name} from ROM: {rom_filename}")
 
         if not rom_filename or not project_name:
+            logger.warning("Missing ROM file or project name")
             flash("ROM file and project name are required", "error")
             return redirect(request.url)
 
@@ -905,6 +1232,7 @@ def new_project():
         output_folder = get_output_folder()
         project_dir = output_folder / secure_filename(project_name)
         project_dir.mkdir(parents=True, exist_ok=True)
+        logger.debug(f"Created project directory: {project_dir}")
 
         # Extract strings
         rom_folder = get_rom_folder()
